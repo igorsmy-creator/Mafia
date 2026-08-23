@@ -3,100 +3,231 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Мафия Онлайн</title>
+    <title>🎭 Mafia Online</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', Tahoma, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #eee;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            color: #fff;
             min-height: 100vh;
             padding: 20px;
+            position: relative;
+            overflow-x: hidden;
         }
-        .container { max-width: 800px; margin: 0 auto; }
-        h1 {
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: 
+                radial-gradient(2px 2px at 20px 30px, rgba(255,255,255,0.3), transparent),
+                radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.2), transparent),
+                radial-gradient(2px 2px at 50px 160px, rgba(255,255,255,0.3), transparent),
+                radial-gradient(2px 2px at 90px 40px, rgba(255,255,255,0.2), transparent),
+                radial-gradient(2px 2px at 130px 80px, rgba(255,255,255,0.3), transparent);
+            background-repeat: repeat;
+            background-size: 200px 200px;
+            opacity: 0.3;
+            pointer-events: none;
+            z-index: -1;
+        }
+        .container { max-width: 800px; margin: 0 auto; position: relative; z-index: 1; }
+        
+        /* Логотип с анимацией */
+        .game-logo {
             text-align: center;
-            font-size: 2.5em;
             margin-bottom: 30px;
-            background: linear-gradient(45deg, #ff6b6b, #ffd93d);
+            animation: glow 3s ease-in-out infinite alternate;
+        }
+        @keyframes glow {
+            from { filter: drop-shadow(0 0 10px rgba(255,107,107,0.5)); }
+            to { filter: drop-shadow(0 0 20px rgba(255,217,61,0.8)); }
+        }
+        .logo-icon {
+            font-size: 4em;
+            margin-bottom: 10px;
+            display: inline-block;
+            animation: float 3s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        h1 {
+            font-size: 2.8em;
+            background: linear-gradient(45deg, #ff6b6b, #ffd93d, #ff6b6b);
+            background-size: 200% auto;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: shine 3s linear infinite;
+            text-shadow: 0 0 30px rgba(255,107,107,0.5);
         }
+        @keyframes shine {
+            to { background-position: 200% center; }
+        }
+        .subtitle {
+            color: #4ecdc4;
+            font-size: 1.1em;
+            margin-top: 5px;
+            opacity: 0.9;
+        }
+        
         .screen {
-            background: rgba(255,255,255,0.1);
-            border-radius: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
             padding: 30px;
             backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
             margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
         }
         .hidden { display: none !important; }
         input[type="text"], input[type="checkbox"], select {
             width: 100%;
             padding: 15px;
-            border: 2px solid #ffd93d;
-            border-radius: 8px;
+            border: 2px solid rgba(255,217,61,0.3);
+            border-radius: 12px;
             background: rgba(0,0,0,0.3);
-            color: #eee;
+            color: #fff;
             font-size: 1.1em;
             margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+        input[type="text"]:focus, select:focus {
+            border-color: #ffd93d;
+            box-shadow: 0 0 15px rgba(255,217,61,0.3);
+            outline: none;
         }
         input[type="range"] { width: 100%; margin: 10px 0; }
-        .checkbox-label { display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 10px 0; }
+        .checkbox-label { 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            cursor: pointer; 
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            transition: background 0.3s;
+        }
+        .checkbox-label:hover { background: rgba(255,255,255,0.1); }
         .checkbox-label input { width: auto; margin: 0; }
+        
         button {
             background: linear-gradient(45deg, #ff6b6b, #ee5a6f);
             color: white;
             border: none;
             padding: 15px 30px;
             font-size: 1.1em;
-            border-radius: 8px;
+            border-radius: 12px;
             cursor: pointer;
             font-weight: bold;
             width: 100%;
             margin: 10px 0;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(255,107,107,0.4);
+            position: relative;
+            overflow: hidden;
         }
-        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(255,107,107,0.4); }
-        .btn-secondary { background: linear-gradient(45deg, #4ecdc4, #44a3aa); }
+        button::before {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 0; height: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        button:hover::before {
+            width: 300px; height: 300px;
+        }
+        button:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 6px 20px rgba(255,107,107,0.6); 
+        }
+        button:active { transform: translateY(0); }
+        .btn-secondary { 
+            background: linear-gradient(45deg, #4ecdc4, #44a3aa);
+            box-shadow: 0 4px 15px rgba(78,205,196,0.4);
+        }
+        .btn-secondary:hover { box-shadow: 0 6px 20px rgba(78,205,196,0.6); }
         .btn-small { padding: 10px 15px; font-size: 0.9em; width: auto; margin: 5px; }
-        .btn-settings { background: linear-gradient(45deg, #667eea, #764ba2); margin-bottom: 15px; }
+        .btn-settings { 
+            background: linear-gradient(45deg, #667eea, #764ba2); 
+            margin-bottom: 15px;
+            box-shadow: 0 4px 15px rgba(102,126,234,0.4);
+        }
+        .btn-settings:hover { box-shadow: 0 6px 20px rgba(102,126,234,0.6); }
+        
         .game-code {
             text-align: center;
-            font-size: 3em;
+            font-size: 3.5em;
             font-weight: bold;
             color: #ffd93d;
-            background: rgba(0,0,0,0.4);
-            padding: 20px;
-            border-radius: 10px;
+            background: linear-gradient(135deg, rgba(255,217,61,0.2), rgba(255,107,107,0.2));
+            padding: 25px;
+            border-radius: 15px;
             margin: 20px 0;
-            letter-spacing: 5px;
+            letter-spacing: 8px;
             border: 3px solid #ffd93d;
+            box-shadow: 0 0 30px rgba(255,217,61,0.3);
+            animation: pulse 2s infinite;
         }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 30px rgba(255,217,61,0.3); }
+            50% { box-shadow: 0 0 50px rgba(255,217,61,0.6); }
+        }
+        
         .player-item {
             background: rgba(0,0,0,0.3);
             padding: 15px;
             margin: 10px 0;
-            border-radius: 8px;
+            border-radius: 12px;
             border-left: 4px solid #4ecdc4;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            transition: all 0.3s;
         }
-        .player-item.host { border-left-color: #ffd93d; }
-        .player-item.dead { opacity: 0.7; border-left-color: #ff6b6b; }
+        .player-item:hover {
+            background: rgba(0,0,0,0.4);
+            transform: translateX(5px);
+        }
+        .player-item.host { 
+            border-left-color: #ffd93d;
+            background: linear-gradient(90deg, rgba(255,217,61,0.1), rgba(0,0,0,0.3));
+        }
+        .player-item.dead { 
+            opacity: 0.6; 
+            border-left-color: #ff6b6b;
+            filter: grayscale(0.8);
+        }
         .player-name { font-size: 1.2em; font-weight: bold; }
         .player-role { color: #ffd93d; font-size: 0.9em; }
         .player-status { font-size: 0.9em; color: #4ecdc4; }
+        
         .phase-indicator {
             text-align: center;
-            font-size: 2em;
-            padding: 20px;
-            border-radius: 10px;
+            font-size: 2.2em;
+            padding: 25px;
+            border-radius: 15px;
             margin: 20px 0;
             font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-        .phase-night { background: linear-gradient(45deg, #2c3e50, #34495e); color: #ffd93d; }
-        .phase-day { background: linear-gradient(45deg, #ffd93d, #ff9a3c); color: #1a1a2e; }
+        .phase-night { 
+            background: linear-gradient(135deg, #1e3c72, #2a5298); 
+            color: #ffd93d;
+            border: 2px solid rgba(255,217,61,0.3);
+        }
+        .phase-day { 
+            background: linear-gradient(135deg, #ffd93d, #ff9a3c); 
+            color: #1a1a2e;
+            border: 2px solid rgba(255,217,61,0.5);
+        }
+        
         .role-card {
             background: linear-gradient(135deg, rgba(255,107,107,0.2), rgba(255,217,61,0.2));
             border: 3px solid #ffd93d;
@@ -104,50 +235,69 @@
             padding: 40px;
             text-align: center;
             margin: 30px 0;
+            box-shadow: 0 0 30px rgba(255,217,61,0.2);
         }
-        .role-icon { font-size: 4em; margin-bottom: 20px; }
-        .role-name { font-size: 2em; font-weight: bold; margin-bottom: 10px; }
-        .role-description { font-size: 1.1em; color: #4ecdc4; }
+        .role-icon { font-size: 5em; margin-bottom: 20px; }
+        .role-name { font-size: 2.5em; font-weight: bold; margin-bottom: 10px; color: #ffd93d; }
+        .role-description { font-size: 1.2em; color: #4ecdc4; }
+        
         .my-role-badge {
             text-align: center;
-            background: rgba(255,217,61,0.15);
-            border: 1px solid #ffd93d;
+            background: linear-gradient(135deg, rgba(255,217,61,0.2), rgba(255,107,107,0.2));
+            border: 2px solid #ffd93d;
             color: #ffd93d;
-            padding: 10px;
-            border-radius: 8px;
+            padding: 15px;
+            border-radius: 12px;
             margin-bottom: 15px;
-            font-size: 1.2em;
+            font-size: 1.3em;
             font-weight: bold;
+            box-shadow: 0 4px 15px rgba(255,217,61,0.3);
         }
-        .vote-section { background: rgba(255,107,107,0.1); padding: 20px; border-radius: 10px; margin: 20px 0; }
+        
+        .vote-section { 
+            background: rgba(255,107,107,0.1); 
+            padding: 20px; 
+            border-radius: 15px; 
+            margin: 20px 0;
+            border: 1px solid rgba(255,107,107,0.3);
+        }
         .vote-button {
             background: rgba(78,205,196,0.2);
             border: 2px solid #4ecdc4;
             padding: 15px;
             margin: 5px;
-            border-radius: 8px;
+            border-radius: 12px;
             cursor: pointer;
             font-size: 1.1em;
             width: 100%;
-            color: #eee;
+            color: #fff;
+            transition: all 0.3s;
         }
-        .vote-button:hover:not(:disabled) { background: rgba(78,205,196,0.4); }
+        .vote-button:hover:not(:disabled) { 
+            background: rgba(78,205,196,0.4);
+            transform: scale(1.02);
+        }
         .vote-button:disabled { opacity: 0.4; cursor: not-allowed; }
-        .vote-button.voted { background: rgba(255,217,61,0.3); border-color: #ffd93d; }
+        .vote-button.voted { 
+            background: rgba(255,217,61,0.3); 
+            border-color: #ffd93d;
+            box-shadow: 0 0 15px rgba(255,217,61,0.4);
+        }
         .vote-count { 
             display: inline-block; 
-            background: #ff6b6b; 
+            background: linear-gradient(135deg, #ff6b6b, #ee5a6f); 
             padding: 5px 12px; 
             border-radius: 15px; 
             margin-left: 10px;
             font-weight: bold;
             font-size: 1.1em;
+            box-shadow: 0 2px 8px rgba(255,107,107,0.4);
         }
         .vote-bar {
             width: 100%;
-            height: 6px;
+            height: 8px;
             background: rgba(255,255,255,0.1);
-            border-radius: 3px;
+            border-radius: 4px;
             margin-top: 8px;
             overflow: hidden;
         }
@@ -155,104 +305,214 @@
             height: 100%;
             background: linear-gradient(90deg, #ff6b6b, #ffd93d);
             transition: width 0.3s ease;
+            box-shadow: 0 0 10px rgba(255,107,107,0.5);
         }
         .vote-stats {
             background: rgba(0,0,0,0.4);
-            padding: 15px;
-            border-radius: 10px;
+            padding: 20px;
+            border-radius: 15px;
             margin-top: 20px;
             border: 1px solid #4ecdc4;
         }
-        .vote-stats h4 { color: #ffd93d; margin-bottom: 10px; text-align: center; }
+        .vote-stats h4 { color: #ffd93d; margin-bottom: 15px; text-align: center; font-size: 1.3em; }
         .vote-stat-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px;
-            margin: 5px 0;
+            padding: 12px;
+            margin: 8px 0;
             background: rgba(255,255,255,0.05);
-            border-radius: 5px;
+            border-radius: 8px;
             flex-wrap: wrap;
-            gap: 5px;
+            gap: 8px;
         }
-        .vote-stat-name { font-weight: bold; }
-        .vote-stat-voted { color: #4ecdc4; font-size: 0.9em; }
+        .vote-stat-name { font-weight: bold; color: #4ecdc4; }
+        .vote-stat-voted { color: #fff; font-size: 0.9em; opacity: 0.8; }
         .vote-stat-votes { color: #ff6b6b; font-weight: bold; }
+        
         .log {
             background: rgba(0,0,0,0.5);
-            padding: 15px;
-            border-radius: 10px;
-            max-height: 200px;
+            padding: 20px;
+            border-radius: 15px;
+            max-height: 250px;
             overflow-y: auto;
             margin: 20px 0;
+            border: 1px solid rgba(255,217,61,0.2);
         }
-        .log-entry { padding: 8px; margin: 5px 0; border-left: 3px solid #ffd93d; background: rgba(255,217,61,0.1); }
-        .waiting-message { text-align: center; font-size: 1.3em; color: #4ecdc4; padding: 20px; font-style: italic; }
-        .action-panel { background: rgba(0,0,0,0.5); padding: 30px; border-radius: 15px; margin: 20px 0; text-align: center; }
-        .action-title { font-size: 2em; margin-bottom: 20px; color: #ffd93d; }
-        .target-selection { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
-        .detective-result { font-size: 1.8em; padding: 20px; border-radius: 10px; margin: 10px 0; font-weight: bold; }
-        .result-mafia { background: rgba(255,107,107,0.3); color: #ff6b6b; border: 2px solid #ff6b6b; }
-        .result-civilian { background: rgba(78,205,196,0.3); color: #4ecdc4; border: 2px solid #4ecdc4; }
-        .settings-panel { background: rgba(255,217,61,0.1); border: 1px solid #ffd93d; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
-        .settings-panel h3 { color: #ffd93d; margin-bottom: 10px; }
+        .log-entry { 
+            padding: 10px; 
+            margin: 8px 0; 
+            border-left: 4px solid #ffd93d; 
+            background: rgba(255,217,61,0.1);
+            border-radius: 0 8px 8px 0;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .waiting-message { 
+            text-align: center; 
+            font-size: 1.3em; 
+            color: #4ecdc4; 
+            padding: 20px; 
+            font-style: italic;
+            animation: fadeIn 1s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .action-panel { 
+            background: rgba(0,0,0,0.5); 
+            padding: 30px; 
+            border-radius: 20px; 
+            margin: 20px 0; 
+            text-align: center;
+            border: 2px solid rgba(255,217,61,0.3);
+            box-shadow: 0 0 30px rgba(255,217,61,0.1);
+        }
+        .action-title { 
+            font-size: 2.2em; 
+            margin-bottom: 25px; 
+            color: #ffd93d;
+            text-shadow: 0 0 20px rgba(255,217,61,0.5);
+        }
+        .target-selection { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); 
+            gap: 15px; 
+            margin: 20px 0; 
+        }
+        
+        .detective-result { 
+            font-size: 2em; 
+            padding: 25px; 
+            border-radius: 15px; 
+            margin: 15px 0; 
+            font-weight: bold;
+            animation: zoomIn 0.5s ease;
+        }
+        @keyframes zoomIn {
+            from { transform: scale(0); }
+            to { transform: scale(1); }
+        }
+        .result-mafia { 
+            background: linear-gradient(135deg, rgba(255,107,107,0.4), rgba(255,107,107,0.2)); 
+            color: #ff6b6b; 
+            border: 3px solid #ff6b6b;
+            box-shadow: 0 0 30px rgba(255,107,107,0.5);
+        }
+        .result-civilian { 
+            background: linear-gradient(135deg, rgba(78,205,196,0.4), rgba(78,205,196,0.2)); 
+            color: #4ecdc4; 
+            border: 3px solid #4ecdc4;
+            box-shadow: 0 0 30px rgba(78,205,196,0.5);
+        }
+        
+        .settings-panel { 
+            background: rgba(255,217,61,0.1); 
+            border: 2px solid rgba(255,217,61,0.3); 
+            padding: 20px; 
+            border-radius: 15px; 
+            margin-bottom: 20px;
+        }
+        .settings-panel h3 { color: #ffd93d; margin-bottom: 15px; font-size: 1.3em; }
         .settings-content {
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.3s ease;
+            transition: max-height 0.5s ease;
         }
-        .settings-content.show { max-height: 500px; }
-        .in-game-settings { position: fixed; top: 10px; right: 10px; z-index: 1000; }
+        .settings-content.show { max-height: 600px; }
+        
+        .in-game-settings { position: fixed; top: 15px; right: 15px; z-index: 1000; }
         .settings-dropdown {
             position: absolute;
             right: 0;
-            top: 40px;
+            top: 45px;
             background: rgba(0,0,0,0.95);
             border: 2px solid #ffd93d;
-            border-radius: 10px;
-            padding: 15px;
-            min-width: 280px;
+            border-radius: 15px;
+            padding: 20px;
+            min-width: 300px;
             display: none;
             max-height: 80vh;
             overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
         }
-        .settings-dropdown.show { display: block; }
+        .settings-dropdown.show { display: block; animation: slideDown 0.3s ease; }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
         .detective-timer-bar {
             width: 100%;
-            height: 8px;
+            height: 10px;
             background: rgba(255,255,255,0.2);
-            border-radius: 4px;
-            margin-top: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
             overflow: hidden;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
         }
         .detective-timer-fill {
             height: 100%;
             background: linear-gradient(90deg, #4ecdc4, #ffd93d);
             transition: width 0.1s linear;
+            box-shadow: 0 0 10px rgba(255,217,61,0.5);
         }
+        
         .final-role-item {
             background: rgba(0,0,0,0.3);
-            padding: 12px 15px;
-            margin: 8px 0;
-            border-radius: 8px;
-            border-left: 4px solid #4ecdc4;
+            padding: 15px 20px;
+            margin: 10px 0;
+            border-radius: 12px;
+            border-left: 5px solid #4ecdc4;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            transition: all 0.3s;
         }
-        .final-role-item.mafia { border-left-color: #ff6b6b; background: rgba(255,107,107,0.1); }
-        .final-role-item.doctor { border-left-color: #4ecdc4; }
-        .final-role-item.detective { border-left-color: #ffd93d; }
+        .final-role-item:hover {
+            transform: translateX(5px);
+            background: rgba(0,0,0,0.4);
+        }
+        .final-role-item.mafia { 
+            border-left-color: #ff6b6b; 
+            background: linear-gradient(90deg, rgba(255,107,107,0.2), rgba(0,0,0,0.3));
+        }
+        .final-role-item.doctor { 
+            border-left-color: #4ecdc4;
+            background: linear-gradient(90deg, rgba(78,205,196,0.2), rgba(0,0,0,0.3));
+        }
+        .final-role-item.detective { 
+            border-left-color: #ffd93d;
+            background: linear-gradient(90deg, rgba(255,217,61,0.2), rgba(0,0,0,0.3));
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 5px; }
+        ::-webkit-scrollbar-thumb { 
+            background: linear-gradient(135deg, #ff6b6b, #ffd93d); 
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb:hover { background: linear-gradient(135deg, #ffd93d, #ff6b6b); }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎭 МАФИЯ ОНЛАЙН 🎭</h1>
+        <div class="game-logo">
+            <div class="logo-icon">🎭</div>
+            <h1>MAFIA ONLINE</h1>
+            <div class="subtitle">Классическая игра в новом формате</div>
+        </div>
         
         <div id="menuScreen" class="screen">
-            <h2 style="text-align: center; margin-bottom: 20px;">Добро пожаловать!</h2>
+            <h2 style="text-align: center; margin-bottom: 20px; color: #4ecdc4;">🎮 Добро пожаловать!</h2>
             
-            <button class="btn-settings" onclick="toggleMainSettings()">⚙️ Настройки голоса</button>
+            <button class="btn-settings" onclick="toggleMainSettings()">️ Настройки голоса и звука</button>
             <div id="mainSettingsContent" class="settings-content">
                 <div class="settings-panel">
                     <label class="checkbox-label">
@@ -261,39 +521,39 @@
                     </label>
                     <label class="checkbox-label">
                         <input type="checkbox" id="soundEnabled" checked>
-                        <span>🔔 Звуковые эффекты</span>
+                        <span> Звуковые эффекты</span>
                     </label>
-                    <label>🗣️ Голос:</label>
+                    <label style="color: #ffd93d; margin-top: 10px; display: block;">🗣️ Голос:</label>
                     <select id="voiceSelect"><option value="">Загрузка голосов...</option></select>
-                    <label>Скорость речи: <span id="rateValue">0.9</span></label>
+                    <label style="color: #4ecdc4;">Скорость речи: <span id="rateValue">0.9</span></label>
                     <input type="range" id="rateSlider" min="0.5" max="1.5" step="0.1" value="0.9">
-                    <label>Высота голоса: <span id="pitchValue">1</span></label>
+                    <label style="color: #4ecdc4;">Высота голоса: <span id="pitchValue">1</span></label>
                     <input type="range" id="pitchSlider" min="0.5" max="1.5" step="0.1" value="1">
                 </div>
             </div>
             
-            <input type="text" id="playerNameInput" placeholder="Введите ваше имя">
+            <input type="text" id="playerNameInput" placeholder="👤 Введите ваше имя">
             <button onclick="createGame()">🎮 Создать игру</button>
             <button class="btn-secondary" onclick="showJoinScreen()">🔗 Присоединиться к игре</button>
         </div>
 
         <div id="joinScreen" class="screen hidden">
-            <h2 style="text-align: center; margin-bottom: 20px;">Присоединение к игре</h2>
-            <input type="text" id="gameCodeInput" placeholder="Код игры">
-            <input type="text" id="joinNameInput" placeholder="Ваше имя">
-            <button onclick="joinGame()">Присоединиться</button>
+            <h2 style="text-align: center; margin-bottom: 20px; color: #4ecdc4;">🔗 Присоединение</h2>
+            <input type="text" id="gameCodeInput" placeholder="🔢 Код игры">
+            <input type="text" id="joinNameInput" placeholder="👤 Ваше имя">
+            <button onclick="joinGame()">▶️ Присоединиться</button>
             <button class="btn-secondary" onclick="showMenuScreen()">← Назад</button>
         </div>
 
         <div id="waitingScreen" class="screen hidden">
-            <h2 style="text-align: center;">Ожидание игроков</h2>
+            <h2 style="text-align: center; color: #4ecdc4;">⏳ Ожидание игроков</h2>
             <div class="game-code" id="displayGameCode">----</div>
-            <p style="text-align: center; margin: 20px 0;">Поделитесь этим кодом с друзьями</p>
+            <p style="text-align: center; margin: 20px 0; color: #ffd93d;">📱 Поделитесь этим кодом с друзьями</p>
             <div id="waitingPlayerList"></div>
             <div id="hostControls" class="hidden">
-                <button id="startGameBtn" onclick="startGame()"> Начать игру</button>
+                <button id="startGameBtn" onclick="startGame()">🎲 Начать игру</button>
             </div>
-            <div class="waiting-message">Ожидание других игроков...</div>
+            <div class="waiting-message"> Ожидание других игроков...</div>
         </div>
 
         <div id="roleScreen" class="screen hidden">
@@ -302,14 +562,14 @@
                 <div class="role-name" id="roleName">Ваша роль</div>
                 <div class="role-description" id="roleDescription">Описание роли</div>
             </div>
-            <div class="waiting-message">Запомните роль. Игра начнется автоматически...</div>
+            <div class="waiting-message">💭 Запомните роль. Игра начнется автоматически...</div>
         </div>
 
         <div id="gameScreen" class="screen hidden">
             <div class="in-game-settings">
                 <button class="btn-small" onclick="toggleSettings()">⚙️ Настройки</button>
                 <div id="settingsDropdown" class="settings-dropdown">
-                    <h3 style="color: #ffd93d; margin-bottom: 10px;">🔊 Звук и голос</h3>
+                    <h3 style="color: #ffd93d; margin-bottom: 15px;">🔊 Настройки</h3>
                     <label class="checkbox-label">
                         <input type="checkbox" id="gameVoiceEnabled" checked onchange="updateSoundSettings()">
                         <span>Голосовое сопровождение</span>
@@ -318,11 +578,11 @@
                         <input type="checkbox" id="gameSoundEnabled" checked onchange="updateSoundSettings()">
                         <span>Звуковые эффекты</span>
                     </label>
-                    <label>🗣️ Голос:</label>
+                    <label style="color: #ffd93d; margin-top: 10px; display: block;">🗣️ Голос:</label>
                     <select id="gameVoiceSelect" onchange="updateVoiceSettings()"><option value="">Загрузка...</option></select>
-                    <label>Скорость: <span id="gameRateValue">0.9</span></label>
+                    <label style="color: #4ecdc4;">Скорость: <span id="gameRateValue">0.9</span></label>
                     <input type="range" id="gameRateSlider" min="0.5" max="1.5" step="0.1" value="0.9" oninput="updateVoiceSettings()">
-                    <label>Высота: <span id="gamePitchValue">1</span></label>
+                    <label style="color: #4ecdc4;">Высота: <span id="gamePitchValue">1</span></label>
                     <input type="range" id="gamePitchSlider" min="0.5" max="1.5" step="0.1" value="1" oninput="updateVoiceSettings()">
                 </div>
             </div>
@@ -334,17 +594,17 @@
                 <div id="targetSelection" class="target-selection"></div>
             </div>
             <div id="voteSection" class="vote-section hidden">
-                <h3 style="text-align: center; margin-bottom: 15px;">🗳️ Голосование</h3>
+                <h3 style="text-align: center; margin-bottom: 15px; color: #ffd93d;">🗳️ Голосование</h3>
                 <div id="voteButtons"></div>
                 <div id="voteStats"></div>
-                <button id="endVotingBtn" onclick="endVoting()" style="margin-top: 15px;" class="hidden">Завершить голосование (только хост)</button>
+                <button id="endVotingBtn" onclick="endVoting()" style="margin-top: 15px;" class="hidden">✅ Завершить голосование (только хост)</button>
             </div>
             <div id="playersList"></div>
             <div id="gameLog" class="log"></div>
         </div>
 
         <div id="winnerScreen" class="screen hidden">
-            <h1 id="winnerTitle" style="text-align: center; margin-bottom: 30px;"></h1>
+            <h1 id="winnerTitle" style="text-align: center; margin-bottom: 30px; font-size: 2.5em;"></h1>
             <div id="finalRoles"></div>
             <button onclick="location.reload()">🔄 Новая игра</button>
         </div>
@@ -385,12 +645,10 @@
         let selectedVoice = null;
         let speechRate = 0.9;
         let speechPitch = 1;
-        
-        // ИСПРАВЛЕНИЕ: Флаг предотвращает повторное планирование перехода
         let advanceScheduled = false;
 
         const ROLES = { MAFIA: 'Мафия', CIVILIAN: 'Мирный житель', DOCTOR: 'Доктор', DETECTIVE: 'Детектив' };
-        const ROLE_ICONS = { 'Мафия': '🔪', 'Мирный житель': '👤', 'Доктор': '💉', 'Детектив': '🔍' };
+        const ROLE_ICONS = { 'Мафия': '🔪', 'Мирный житель': '👤', 'Доктор': '💉', 'Детектив': '' };
 
         function toggleMainSettings() {
             document.getElementById('mainSettingsContent').classList.toggle('show');
@@ -594,7 +852,6 @@
             });
         }
 
-        // ИСПРАВЛЕНИЕ: Полностью переписанная логика переходов
         function updateUI(game) {
             const mp = game.players[myPlayerId];
             if (!mp) return;
@@ -615,8 +872,6 @@
                 showFinalResults(game);
             }
 
-            // ИСПРАВЛЕНИЕ: Новая логика переходов
-            // Проверяем флаг actionCompleted текущего действия
             const currentAction = game.activeAction;
             const actionCompleted = currentAction ? game[`${currentAction}Acted`] : false;
             
@@ -624,14 +879,9 @@
                                           game.detectiveActionDone && 
                                           !game.detectiveResultSeen;
             
-            // Планируем переход ТОЛЬКО если:
-            // 1. Игрок реально сделал выбор (actionCompleted = true)
-            // 2. Детектив не смотрит результат
-            // 3. Переход ещё не запланирован (advanceScheduled = false)
             if (myPlayerId === game.hostId && actionCompleted && !detectiveStillViewing && !advanceScheduled) {
                 advanceScheduled = true;
                 const expectedAction = currentAction;
-                console.log(`[HOST] Планирую переход от ${expectedAction}, actionCompleted=true`);
                 setTimeout(() => advanceNightPhaseHost(expectedAction), 2000);
             }
             
@@ -663,7 +913,7 @@
             document.getElementById('myRoleBadge').innerHTML = `Ваша роль: ${ROLE_ICONS[myRole] || ''} ${myRole || 'Неизвестно'}`;
             const pe = document.getElementById('phaseIndicator');
             if (game.phase === 'night') { pe.className = 'phase-indicator phase-night'; pe.textContent = `🌙 Ночь ${game.day}`; }
-            else if (game.phase === 'day') { pe.className = 'phase-indicator phase-day'; pe.textContent = `☀️ День ${game.day}`; }
+            else if (game.phase === 'day') { pe.className = 'phase-indicator phase-day'; pe.textContent = `️ День ${game.day}`; }
             else if (game.phase === 'voting') { pe.className = 'phase-indicator phase-day'; pe.textContent = `🗳️ Голосование - День ${game.day}`; }
 
             renderPlayerList(game);
@@ -717,7 +967,7 @@
                 targets = Object.values(gameData.players).filter(p => p.alive && p.role !== 'Мафия');
                 startRoleTimeout('mafia', 30000);
             } else if (action === 'doctor' && cr === 'Доктор') {
-                title.textContent = '💉 Доктор, выберите кого спасти';
+                title.textContent = ' Доктор, выберите кого спасти';
                 targets = Object.values(gameData.players).filter(p => p.alive);
                 startRoleTimeout('doctor', 30000);
             } else if (action === 'detective' && cr === 'Детектив') {
@@ -737,7 +987,7 @@
                             title.textContent = '🔍 Результат проверки';
                             sel.innerHTML = `
                                 <div class="detective-result ${isMafia ? 'result-mafia' : 'result-civilian'}">
-                                    ${target.name}: ${isMafia ? ' МАФИЯ!' : '✅ Мирный житель'}
+                                    ${target.name}: ${isMafia ? '🔪 МАФИЯ!' : '✅ Мирный житель'}
                                 </div>
                                 <div class="waiting-message" id="detectiveTimerText">Запомните результат...</div>
                                 <div class="detective-timer-bar"><div class="detective-timer-fill" id="detectiveTimerFill" style="width:100%"></div></div>
@@ -754,7 +1004,6 @@
                                 if (remaining <= 0) {
                                     clearInterval(detectiveLocalTimer);
                                     detectiveLocalTimer = null;
-                                    // ИСПРАВЛЕНИЕ: Устанавливаем detectiveActed = true
                                     database.ref(`games/${currentGameId}`).update({ 
                                         detectiveResultSeen: true,
                                         detectiveActed: true
@@ -791,7 +1040,6 @@
             roleTimeoutTimer = setTimeout(async () => {
                 const ref = database.ref(`games/${currentGameId}`);
                 if (gameData.activeAction === role) {
-                    console.log(`[TIMEOUT] ${role} не сделал выбор, пропускаем`);
                     await ref.update({ 
                         [`${role}Acted`]: true,
                         [`${role}Vote`]: null
@@ -808,40 +1056,27 @@
                 
                 playSound('action');
                 
-                const updates = {
-                    [ak]: targetId
-                };
-                
-                // ИСПРАВЛЕНИЕ: Устанавливаем флаг что действие совершено
+                const updates = { [ak]: targetId };
                 if (myRole === 'Мафия') updates.mafiaActed = true;
                 else if (myRole === 'Доктор') updates.doctorActed = true;
                 else if (myRole === 'Детектив') {
                     updates.detectiveActionDone = true;
                     updates.detectiveResultSeen = false;
-                    // detectiveActed установится после просмотра результата
                 }
                 
                 await ref.update(updates);
-                console.log(`[ACTION] ${myRole} выбрал ${targetId}`);
                 
                 if (roleTimeoutTimer) { clearTimeout(roleTimeoutTimer); roleTimeoutTimer = null; }
             } catch (e) { alert('Ошибка: ' + e.message); }
         }
 
-        // ИСПРАВЛЕНИЕ: Принимает expectedAction и проверяет его
         async function advanceNightPhaseHost(expectedAction) {
             advanceScheduled = false;
             const ref = database.ref(`games/${currentGameId}`);
             const snap = await ref.once('value');
             const g = snap.val();
             
-            // ИСПРАВЛЕНИЕ: Проверяем что действие всё ещё то которое мы ожидаем
-            if (g.activeAction !== expectedAction) {
-                console.log(`[HOST] Ожидал ${expectedAction}, но сейчас ${g.activeAction}. Отмена перехода.`);
-                return;
-            }
-            
-            console.log(`[HOST] Выполняю переход от ${expectedAction}`);
+            if (g.activeAction !== expectedAction) return;
             
             const cl = Array.isArray(g.log) ? g.log : (g.log ? [g.log] : []);
 
@@ -852,10 +1087,9 @@
                     speak('Просыпается доктор');
                     await ref.update({ 
                         activeAction: 'doctor',
-                        doctorActed: false,  // Сбрасываем - доктор ещё не действовал
+                        doctorActed: false,
                         log: [...cl, '💉 Доктор просыпается'] 
                     });
-                    console.log('[HOST] Перешёл к доктору');
                 } else {
                     await advanceToDetectiveOrDay(ref, g);
                 }
@@ -870,7 +1104,6 @@
                     dayStartedAt: Date.now(),
                     log: [...cl, '☀️ Ночь закончилась. Город просыпается.'] 
                 });
-                console.log('[HOST] Перешёл ко дню');
             }
         }
 
@@ -885,10 +1118,9 @@
                     activeAction: 'detective',
                     detectiveActionDone: false,
                     detectiveResultSeen: false,
-                    detectiveActed: false,  // Сбрасываем
-                    log: [...cl, ' Детектив просыпается'] 
+                    detectiveActed: false,
+                    log: [...cl, '🔍 Детектив просыпается'] 
                 });
-                console.log('[HOST] Перешёл к детективу');
             } else {
                 playSound('day');
                 speak('Ночь закончилась. Наступает день');
@@ -898,7 +1130,6 @@
                     dayStartedAt: Date.now(),
                     log: [...cl, '☀️ Ночь закончилась. Город просыпается.'] 
                 });
-                console.log('[HOST] Перешёл ко дню (нет детектива)');
             }
         }
 
@@ -1010,7 +1241,7 @@
             if (ep && mx > 0 && !tie) {
                 const p = gameData.players[ep];
                 await ref.child(`players/${ep}/alive`).set(false);
-                nl.push(`🗳️ ${p.name} был исключен (${mx} голосов). Роль: ${p.role}`);
+                nl.push(`️ ${p.name} был исключен (${mx} голосов). Роль: ${p.role}`);
                 speak(`${p.name} был исключен из игры. Его роль: ${p.role}`);
             } else if (tie) {
                 nl.push('🗳️ Голоса разделились поровну. Никто не был исключен.');
@@ -1033,7 +1264,8 @@
             } else {
                 setTimeout(async () => {
                     playSound('night');
-                    speak('Наступает ночь. Город засыпает.');
+                    // ИСПРАВЛЕНИЕ: Озвучка для всех ночей
+                    speak(`Наступает ночь ${ug.day + 1}. Город засыпает.`);
                     await ref.update({
                         phase: 'night', day: ug.day + 1, activeAction: 'mafia',
                         mafiaVote: null, doctorVote: null, detectiveVote: null,
@@ -1042,14 +1274,15 @@
                         votes: {},
                         log: [...nl, `🌙 Ночь ${ug.day + 1}`, '🔪 Мафия просыпается']
                     });
-                    console.log('[HOST] Начата новая ночь');
+                    // Озвучка пробуждения мафии для всех ночей
+                    setTimeout(() => speak('Мафия просыпается'), 1500);
                 }, 5000);
             }
         }
 
         function showFinalResults(game) {
             const mc = Object.values(game.players).filter(p => p.role === 'Мафия' && p.alive).length;
-            const wt = mc === 0 ? 'Мирные жители победили! 🎉' : 'Мафия победила! 🔪';
+            const wt = mc === 0 ? '🎉 Мирные жители победили!' : '🔪 Мафия победила!';
             document.getElementById('winnerTitle').textContent = wt;
             document.getElementById('finalRoles').innerHTML = Object.values(game.players).map(p => {
                 let rc = '';
@@ -1078,15 +1311,15 @@
                 setTimeout(async () => {
                     try {
                         playSound('night');
-                        speak('Наступает ночь. Город засыпает');
+                        // ИСПРАВЛЕНИЕ: Озвучка первой ночи
+                        speak('Наступает ночь 1. Город засыпает.');
                         await ref.update({
                             phase: 'night', day: 1, activeAction: 'mafia',
                             mafiaActed: false, doctorActed: false, detectiveActed: false,
                             detectiveActionDone: false, detectiveResultSeen: false,
-                            log: ['🌙 Наступает ночь. Город засыпает.', ' Мафия просыпается']
+                            log: ['🌙 Наступает ночь 1. Город засыпает.', ' Мафия просыпается']
                         });
-                        setTimeout(() => speak('Просыпается мафия'), 1000);
-                        console.log('[HOST] Игра началась, ночь 1');
+                        setTimeout(() => speak('Мафия просыпается'), 1500);
                     } catch (e) { console.error(e); }
                 }, 15000);
             } catch (e) { alert('Ошибка: ' + e.message); }
