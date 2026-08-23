@@ -11,7 +11,7 @@
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             color: #eee;
             min-height: 100vh;
-            padding: 20px; 
+            padding: 20px;
         }
         .container { max-width: 800px; margin: 0 auto; }
         h1 {
@@ -48,10 +48,7 @@
             cursor: pointer;
             margin: 10px 0;
         }
-        .checkbox-label input {
-            width: auto;
-            margin: 0;
-        }
+        .checkbox-label input { width: auto; margin: 0; }
         button {
             background: linear-gradient(45deg, #ff6b6b, #ee5a6f);
             color: white;
@@ -66,12 +63,7 @@
         }
         button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(255,107,107,0.4); }
         .btn-secondary { background: linear-gradient(45deg, #4ecdc4, #44a3aa); }
-        .btn-small {
-            padding: 10px 15px;
-            font-size: 0.9em;
-            width: auto;
-            margin: 5px;
-        }
+        .btn-small { padding: 10px 15px; font-size: 0.9em; width: auto; margin: 5px; }
         .game-code {
             text-align: center;
             font-size: 3em;
@@ -144,7 +136,6 @@
             color: #eee;
         }
         .vote-button:hover:not(:disabled) { background: rgba(78,205,196,0.4); }
-        .vote-button:disabled { opacity: 0.4; cursor: not-allowed; }
         .vote-count { display: inline-block; background: #ff6b6b; padding: 5px 10px; border-radius: 5px; margin-left: 10px; }
         .log {
             background: rgba(0,0,0,0.5);
@@ -162,23 +153,9 @@
         .detective-result { font-size: 1.8em; padding: 20px; border-radius: 10px; margin: 10px 0; font-weight: bold; }
         .result-mafia { background: rgba(255,107,107,0.3); color: #ff6b6b; border: 2px solid #ff6b6b; }
         .result-civilian { background: rgba(78,205,196,0.3); color: #4ecdc4; border: 2px solid #4ecdc4; }
-        .settings-panel {
-            background: rgba(255,217,61,0.1);
-            border: 1px solid #ffd93d;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-        .settings-panel h3 {
-            color: #ffd93d;
-            margin-bottom: 10px;
-        }
-        .in-game-settings {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            z-index: 1000;
-        }
+        .settings-panel { background: rgba(255,217,61,0.1); border: 1px solid #ffd93d; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        .settings-panel h3 { color: #ffd93d; margin-bottom: 10px; }
+        .in-game-settings { position: fixed; top: 10px; right: 10px; z-index: 1000; }
         .settings-dropdown {
             position: absolute;
             right: 0;
@@ -190,9 +167,7 @@
             min-width: 250px;
             display: none;
         }
-        .settings-dropdown.show {
-            display: block;
-        }
+        .settings-dropdown.show { display: block; }
     </style>
 </head>
 <body>
@@ -201,19 +176,17 @@
         
         <div id="menuScreen" class="screen">
             <h2 style="text-align: center; margin-bottom: 20px;">Добро пожаловать!</h2>
-            
             <div class="settings-panel">
                 <h3>⚙️ Настройки</h3>
                 <label class="checkbox-label">
                     <input type="checkbox" id="voiceEnabled" checked>
-                    <span>🔊 Голосовое сопровождение (объявления фаз)</span>
+                    <span>🔊 Голосовое сопровождение</span>
                 </label>
                 <label class="checkbox-label">
                     <input type="checkbox" id="soundEnabled" checked>
                     <span>🔔 Звуковые эффекты</span>
                 </label>
             </div>
-            
             <input type="text" id="playerNameInput" placeholder="Введите ваше имя">
             <button onclick="createGame()">🎮 Создать игру</button>
             <button class="btn-secondary" onclick="showJoinScreen()">🔗 Присоединиться к игре</button>
@@ -249,9 +222,9 @@
 
         <div id="gameScreen" class="screen hidden">
             <div class="in-game-settings">
-                <button class="btn-small" onclick="toggleSettings()">⚙️ Настройки</button>
+                <button class="btn-small" onclick="toggleSettings()">️ Настройки</button>
                 <div id="settingsDropdown" class="settings-dropdown">
-                    <h3 style="color: #ffd93d; margin-bottom: 10px;">🔊 Звук</h3>
+                    <h3 style="color: #ffd93d; margin-bottom: 10px;"> Звук</h3>
                     <label class="checkbox-label">
                         <input type="checkbox" id="gameVoiceEnabled" checked onchange="updateSoundSettings()">
                         <span>Голосовое сопровождение</span>
@@ -270,7 +243,7 @@
                 <div id="targetSelection" class="target-selection"></div>
             </div>
             <div id="voteSection" class="vote-section hidden">
-                <h3 style="text-align: center; margin-bottom: 15px;">️ Голосование</h3>
+                <h3 style="text-align: center; margin-bottom: 15px;">🗳️ Голосование</h3>
                 <div id="voteButtons"></div>
                 <button onclick="endVoting()" style="margin-top: 15px;">Завершить голосование</button>
             </div>
@@ -315,28 +288,24 @@
         let soundEnabled = true;
         let audioContext = null;
         let audioInitialized = false;
-        let votingPhaseStarted = false; // Локальный флаг для предотвращения повторного запуска
+        let votingTimer = null;
 
         const ROLES = { MAFIA: 'Мафия', CIVILIAN: 'Мирный житель', DOCTOR: 'Доктор', DETECTIVE: 'Детектив' };
-        const ROLE_ICONS = { 'Мафия': '🔪', 'Мирный житель': '👤', 'Доктор': '', 'Детектив': '🔍' };
+        const ROLE_ICONS = { 'Мафия': '🔪', 'Мирный житель': '👤', 'Доктор': '💉', 'Детектив': '🔍' };
 
         function initAudio() {
             if (audioInitialized) return;
             try {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 audioInitialized = true;
-            } catch(e) {
-                console.error('Audio init failed:', e);
-            }
+            } catch(e) { console.error('Audio init failed:', e); }
         }
 
         function playSound(type) {
             if (!soundEnabled || !audioContext) return;
-            
             try {
                 const oscillator = audioContext.createOscillator();
                 const gainNode = audioContext.createGain();
-                
                 oscillator.connect(gainNode);
                 gainNode.connect(audioContext.destination);
                 
@@ -373,14 +342,11 @@
                         oscillator.stop(audioContext.currentTime + 0.1);
                         break;
                 }
-            } catch(e) {
-                console.error('Sound play failed:', e);
-            }
+            } catch(e) { console.error('Sound play failed:', e); }
         }
 
         function speak(text) {
             if (!voiceEnabled || !window.speechSynthesis) return;
-            
             try {
                 speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
@@ -388,20 +354,16 @@
                 utterance.rate = 0.9;
                 utterance.pitch = 1;
                 speechSynthesis.speak(utterance);
-            } catch(e) {
-                console.error('Speech failed:', e);
-            }
+            } catch(e) { console.error('Speech failed:', e); }
         }
 
         function toggleSettings() {
-            const dropdown = document.getElementById('settingsDropdown');
-            dropdown.classList.toggle('show');
+            document.getElementById('settingsDropdown').classList.toggle('show');
         }
 
         function updateSoundSettings() {
             voiceEnabled = document.getElementById('gameVoiceEnabled').checked;
             soundEnabled = document.getElementById('gameSoundEnabled').checked;
-            
             const menuVoice = document.getElementById('voiceEnabled');
             const menuSound = document.getElementById('soundEnabled');
             if (menuVoice) menuVoice.checked = voiceEnabled;
@@ -414,7 +376,11 @@
             document.getElementById('settingsDropdown')?.classList.remove('show');
         }
         function showJoinScreen() { hideAllScreens(); document.getElementById('joinScreen').classList.remove('hidden'); }
-        function showWaitingScreen(gameCode) { hideAllScreens(); document.getElementById('waitingScreen').classList.remove('hidden'); document.getElementById('displayGameCode').textContent = gameCode; }
+        function showWaitingScreen(gameCode) { 
+            hideAllScreens(); 
+            document.getElementById('waitingScreen').classList.remove('hidden'); 
+            document.getElementById('displayGameCode').textContent = gameCode; 
+        }
         function showRoleScreen() { hideAllScreens(); document.getElementById('roleScreen').classList.remove('hidden'); }
         function showGameScreen() { 
             hideAllScreens(); 
@@ -431,7 +397,6 @@
             
             voiceEnabled = document.getElementById('voiceEnabled').checked;
             soundEnabled = document.getElementById('soundEnabled').checked;
-            
             initAudio();
             
             try {
@@ -457,7 +422,6 @@
             
             voiceEnabled = document.getElementById('voiceEnabled').checked;
             soundEnabled = document.getElementById('soundEnabled').checked;
-            
             initAudio();
             
             try {
@@ -518,13 +482,13 @@
                 setTimeout(() => advanceNightPhaseHost(), 3000);
             }
             
-            // Автоматический переход к голосованию днем (только для хоста)
-            if (myPlayerId === game.hostId && game.phase === 'day' && game.dayStartedAt && !votingPhaseStarted) {
+            // Запуск таймера голосования (только для хоста)
+            if (myPlayerId === game.hostId && game.phase === 'day' && game.dayStartedAt && !votingTimer) {
                 const timeSinceDayStart = Date.now() - game.dayStartedAt;
-                if (timeSinceDayStart > 8000) {
-                    votingPhaseStarted = true; // Устанавливаем флаг СРАЗУ
+                const remainingTime = Math.max(0, 8000 - timeSinceDayStart);
+                votingTimer = setTimeout(() => {
                     startVotingPhase();
-                }
+                }, remainingTime);
             }
         }
 
@@ -698,7 +662,6 @@
                     activeAction: null, 
                     phase: 'day',
                     dayStartedAt: Date.now(),
-                    votingStarted: false,
                     log: [...currentLog, '☀️ Ночь закончилась. Город просыпается.'] 
                 });
             }
@@ -719,13 +682,17 @@
                     activeAction: null, 
                     phase: 'day',
                     dayStartedAt: Date.now(),
-                    votingStarted: false,
                     log: [...currentLog, '☀️ Ночь закончилась. Город просыпается.'] 
                 });
             }
         }
 
         async function startVotingPhase() {
+            if (votingTimer) {
+                clearTimeout(votingTimer);
+                votingTimer = null;
+            }
+            
             const ref = database.ref(`games/${currentGameId}`);
             const currentLog = Array.isArray(gameData.log) ? gameData.log : [gameData.log];
             
@@ -745,7 +712,6 @@
             
             await ref.update({
                 phase: 'voting',
-                votingStarted: true,
                 votes: {},
                 log: newLog
             });
@@ -835,7 +801,6 @@
                 await ref.update({ phase: 'finished', log: [...newLog, '🔪 Мафия победила!'] });
                 speak('Мафия победила');
             } else {
-                votingPhaseStarted = false; // Сбрасываем флаг для следующей ночи
                 setTimeout(async () => {
                     playSound('night');
                     speak('Наступает ночь');
@@ -847,6 +812,7 @@
                         doctorVote: null,
                         detectiveVote: null,
                         votes: {},
+                        lastActionAt: 0,
                         log: [...newLog, `🌙 Ночь ${game.day + 1}`, '🔪 Мафия просыпается']
                     });
                 }, 5000);
@@ -855,7 +821,7 @@
 
         function showFinalResults(game) {
             const mafiaCount = Object.values(game.players).filter(p => p.role === 'Мафия' && p.alive).length;
-            document.getElementById('winnerTitle').textContent = mafiaCount === 0 ? 'Мирные жители победили! ' : 'Мафия победила! 🔪';
+            document.getElementById('winnerTitle').textContent = mafiaCount === 0 ? 'Мирные жители победили! 🎉' : 'Мафия победила! 🔪';
             document.getElementById('finalRoles').innerHTML = Object.values(game.players).map(p => `
                 <div class="player-item">
                     <div>
@@ -875,7 +841,6 @@
 
             voiceEnabled = document.getElementById('voiceEnabled').checked;
             soundEnabled = document.getElementById('soundEnabled').checked;
-            
             initAudio();
 
             try {
@@ -896,9 +861,13 @@
                             phase: 'night',
                             day: 1,
                             activeAction: 'mafia',
-                            lastActionAt: 0, // ИСПРАВЛЕНИЕ: устанавливаем в 0, чтобы не триггерить advanceNightPhaseHost
-                            log: ['🌙 Наступает ночь. Город засыпает.', '🔪 Мафия просыпается']
+                            lastActionAt: 0,
+                            log: ['🌙 Наступает ночь. Город засыпает.', ' Мафия просыпается']
                         });
+                        // Добавляем голосовое объявление для мафии
+                        setTimeout(() => {
+                            speak('Просыпается мафия');
+                        }, 1000);
                     } catch (e) { console.error(e); }
                 }, 15000);
             } catch (e) { alert('Ошибка: ' + e.message); }
