@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -199,6 +199,7 @@
             border-radius: 8px;
             cursor: pointer;
             font-size: 1.1em;
+            width: 100%;
         }
 
         .vote-button:hover:not(:disabled) {
@@ -252,6 +253,17 @@
             font-style: italic;
         }
 
+        .debug-info {
+            background: rgba(255,255,0,0.1);
+            border: 1px solid #ffd93d;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-size: 0.9em;
+            font-family: monospace;
+            word-break: break-all;
+        }
+
         @media (max-width: 600px) {
             h1 { font-size: 2em; }
             .game-code { font-size: 2em; }
@@ -287,15 +299,16 @@
             <p style="text-align: center; margin: 20px 0;">Поделитесь этим кодом с друзьями</p>
             <div id="waitingPlayerList" class="player-list"></div>
             <div id="hostControls" class="hidden">
-                <button onclick="startGame()">🎲 Начать игру</button>
+                <button id="startGameBtn" onclick="startGame()">🎲 Начать игру</button>
             </div>
             <div class="waiting-message">Ожидание других игроков...</div>
+            <div id="debugInfo" class="debug-info hidden"></div>
         </div>
 
         <!-- Экран роли -->
         <div id="roleScreen" class="screen hidden">
             <div class="role-card">
-                <div class="role-icon" id="roleIcon">🎭</div>
+                <div class="role-icon" id="roleIcon"></div>
                 <div class="role-name" id="roleName">Ваша роль</div>
                 <div class="role-description" id="roleDescription">Описание роли</div>
             </div>
@@ -376,7 +389,6 @@
         let myRole = null;
         let gameData = null;
         let gameListener = null;
-        let votesListener = null;
 
         const ROLES = {
             MAFIA: 'Мафия',
@@ -403,8 +415,9 @@
 
             try {
                 // Анонимная авторизация
-                await auth.signInAnonymously();
-                myPlayerId = auth.currentUser.uid;
+                const userCredential = await auth.signInAnonymously();
+                myPlayerId = userCredential.user.uid;
+                console.log('Auth success, UID:', myPlayerId);
 
                 // Создание игры
                 const gameCode = generateGameCode();
@@ -429,6 +442,7 @@
                 };
 
                 await database.ref(`games/${gameCode}`).set(gameData);
+                console.log('Game created:', gameCode);
                 
                 showWaitingScreen(gameCode);
                 setupGameListener(gameCode);
@@ -448,8 +462,9 @@
             }
 
             try {
-                await auth.signInAnonymously();
-                myPlayerId = auth.currentUser.uid;
+                const userCredential = await auth.signInAnonymously();
+                myPlayerId = userCredential.user.uid;
+                console.log('Auth success, UID:', myPlayerId);
 
                 const gameRef = database.ref(`games/${gameCode}`);
                 const snapshot = await gameRef.once('value');
@@ -537,8 +552,12 @@
             
             gameListener = gameRef.on('value', (snapshot) => {
                 const game = snapshot.val();
-                if (!game) return;
+                if (!game) {
+                    console.log('Game data is null');
+                    return;
+                }
 
+                console.log('Game data updated:', game);
                 gameData = game;
                 const myPlayer = game.players[myPlayerId];
 
@@ -552,7 +571,10 @@
 
         function updateUI(game) {
             const myPlayer = game.players[myPlayerId];
-            if (!myPlayer) return;
+            if (!myPlayer) {
+                console.log('Player not found in game');
+                return;
+            }
 
             // Обновление списка игроков на экране ожидания
             if (game.phase === 'waiting') {
@@ -566,7 +588,7 @@
             }
 
             // Игровой процесс
-            if (game.phase === 'night' || game.phase === 'day') {
+            if (game.phase === 'night' || game.phase === 'day' || game.phase === 'voting') {
                 showGameScreen();
                 updateGameScreen(game);
             }
@@ -583,7 +605,7 @@
             list.innerHTML = Object.values(players).map(p => `
                 <div class="player-item ${p.isHost ? 'host' : ''}">
                     <div>
-                        <div class="player-name">${p.name} ${p.isHost ? '👑' : ''}</div>
+                        <div class="player-name">${p.name} ${p.isHost ? '' : ''}</div>
                         <div class="player-status">${p.id === myPlayerId ? 'Вы' : ''}</div>
                     </div>
                 </div>
@@ -596,7 +618,7 @@
         }
 
         function displayRole(role) {
-            document.getElementById('roleIcon').textContent = ROLE_ICONS[role] || '🎭';
+            document.getElementById('roleIcon').textContent = ROLE_ICONS[role] || '';
             document.getElementById('roleName').textContent = role;
             document.getElementById('roleDescription').textContent = getRoleDescription(role);
         }
@@ -619,7 +641,7 @@
             if (game.phase === 'night') {
                 phaseEl.className = 'phase-indicator phase-night';
                 phaseEl.textContent = `🌙 Ночь ${game.day}`;
-            } else {
+            } else if (game.phase === 'day') {
                 phaseEl.className = 'phase-indicator phase-day';
                 phaseEl.textContent = `☀️ День ${game.day}`;
             }
@@ -648,7 +670,7 @@
             list.innerHTML = Object.values(players).map(p => `
                 <div class="player-item ${p.isHost ? 'host' : ''} ${!p.alive ? 'dead' : ''}">
                     <div>
-                        <div class="player-name">${p.name} ${p.isHost ? '' : ''}</div>
+                        <div class="player-name">${p.name}</div>
                         <div class="player-role">${p.role || '?'}</div>
                     </div>
                     <div class="player-status">${p.alive ? '✅ Жив' : '💀 Мертв'}</div>
@@ -688,17 +710,23 @@
         }
 
         async function performNightAction(targetId) {
-            const gameRef = database.ref(`games/${currentGameId}`);
-            
-            if (myRole === ROLES.MAFIA) {
-                await gameRef.child('mafiaVote').set(targetId);
-            } else if (myRole === ROLES.DOCTOR) {
-                await gameRef.child('doctorVote').set(targetId);
-            } else if (myRole === ROLES.DETECTIVE) {
-                await gameRef.child('detectiveVote').set(targetId);
+            try {
+                const gameRef = database.ref(`games/${currentGameId}`);
+                
+                if (myRole === ROLES.MAFIA) {
+                    await gameRef.child('mafiaVote').set(targetId);
+                } else if (myRole === ROLES.DOCTOR) {
+                    await gameRef.child('doctorVote').set(targetId);
+                } else if (myRole === ROLES.DETECTIVE) {
+                    await gameRef.child('detectiveVote').set(targetId);
+                }
+                
+                document.getElementById('actionPanel').classList.add('hidden');
+                console.log('Night action performed:', targetId);
+            } catch (error) {
+                console.error('Error performing night action:', error);
+                alert('Ошибка: ' + error.message);
             }
-            
-            document.getElementById('actionPanel').classList.add('hidden');
         }
 
         function showVotingSection(game) {
@@ -737,11 +765,17 @@
         }
 
         async function castVote(targetId) {
-            if (gameData.players[myPlayerId].voted) return;
+            try {
+                if (gameData.players[myPlayerId].voted) return;
 
-            const gameRef = database.ref(`games/${currentGameId}`);
-            await gameRef.child(`players/${myPlayerId}/voted`).set(targetId);
-            await gameRef.child(`votes/${targetId}`).transaction(count => (count || 0) + 1);
+                const gameRef = database.ref(`games/${currentGameId}`);
+                await gameRef.child(`players/${myPlayerId}/voted`).set(targetId);
+                await gameRef.child(`votes/${targetId}`).transaction(count => (count || 0) + 1);
+                console.log('Vote cast for:', targetId);
+            } catch (error) {
+                console.error('Error casting vote:', error);
+                alert('Ошибка голосования: ' + error.message);
+            }
         }
 
         function updateLog(log) {
@@ -765,7 +799,7 @@
                 <div class="player-item">
                     <div>
                         <div class="player-name">${p.name}</div>
-                        <div class="player-role">${ROLE_ICONS[p.role]} ${p.role}</div>
+                        <div class="player-role">${ROLE_ICONS[p.role] || ''} ${p.role}</div>
                     </div>
                     <div class="player-status">${p.alive ? '✅' : '💀'}</div>
                 </div>
@@ -775,39 +809,69 @@
         // ========== УПРАВЛЕНИЕ ИГРОЙ (ХОСТ) ==========
 
         async function startGame() {
-            if (myPlayerId !== gameData.hostId) return;
+            console.log('startGame called');
+            console.log('myPlayerId:', myPlayerId);
+            console.log('gameData:', gameData);
+            console.log('gameData.hostId:', gameData?.hostId);
+
+            if (!gameData) {
+                alert('Данные игры не загружены!');
+                return;
+            }
+
+            if (myPlayerId !== gameData.hostId) {
+                alert('Только хост может начать игру!');
+                return;
+            }
 
             const playerCount = Object.keys(gameData.players).length;
+            console.log('Player count:', playerCount);
+
             if (playerCount < 4) {
                 alert('Нужно минимум 4 игрока!');
                 return;
             }
 
-            const gameRef = database.ref(`games/${currentGameId}`);
-            
-            // Раздача ролей
-            const roles = distributeRoles(playerCount);
-            const players = Object.keys(gameData.players);
-            
-            const updates = {
-                phase: 'role_reveal',
-                players: {}
-            };
+            try {
+                const gameRef = database.ref(`games/${currentGameId}`);
+                
+                // Раздача ролей
+                const roles = distributeRoles(playerCount);
+                const players = Object.keys(gameData.players);
+                
+                console.log('Distributing roles:', roles);
+                
+                const updates = {
+                    phase: 'role_reveal',
+                    players: {}
+                };
 
-            players.forEach((playerId, index) => {
-                updates.players[`${playerId}/role`] = roles[index];
-            });
-
-            await gameRef.update(updates);
-
-            // Через 10 секунд начинаем первую ночь
-            setTimeout(async () => {
-                await gameRef.update({
-                    phase: 'night',
-                    activeAction: 'mafia',
-                    log: ['=== Ночь 1 ===', 'Мафия просыпается']
+                players.forEach((playerId, index) => {
+                    updates.players[`${playerId}/role`] = roles[index];
                 });
-            }, 10000);
+
+                console.log('Updates:', updates);
+                await gameRef.update(updates);
+                console.log('Game phase updated to role_reveal');
+
+                // Через 15 секунд начинаем первую ночь
+                setTimeout(async () => {
+                    try {
+                        await gameRef.update({
+                            phase: 'night',
+                            day: 1,
+                            activeAction: 'mafia',
+                            log: ['=== Ночь 1 ===', 'Мафия просыпается']
+                        });
+                        console.log('Game started: night phase');
+                    } catch (error) {
+                        console.error('Error starting night:', error);
+                    }
+                }, 15000);
+            } catch (error) {
+                console.error('Error starting game:', error);
+                alert('Ошибка начала игры: ' + error.message);
+            }
         }
 
         function distributeRoles(playerCount) {
@@ -830,10 +894,19 @@
 
         // Очистка при выходе
         window.addEventListener('beforeunload', () => {
-            if (gameListener) {
+            if (gameListener && currentGameId) {
                 database.ref(`games/${currentGameId}`).off('value', gameListener);
             }
         });
+
+        // Debug: показать информацию на экране
+        setInterval(() => {
+            const debugEl = document.getElementById('debugInfo');
+            if (debugEl && gameData) {
+                debugEl.textContent = `Phase: ${gameData.phase}, Players: ${Object.keys(gameData.players).length}, Host: ${gameData.hostId === myPlayerId}`;
+                debugEl.classList.remove('hidden');
+            }
+        }, 2000);
     </script>
 </body>
 </html>
