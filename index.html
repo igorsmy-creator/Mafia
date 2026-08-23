@@ -197,7 +197,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎭 МАФИЯ ОНЛАЙН </h1>
+        <h1>🎭 МАФИЯ ОНЛАЙН 🎭</h1>
         
         <div id="menuScreen" class="screen">
             <h2 style="text-align: center; margin-bottom: 20px;">Добро пожаловать!</h2>
@@ -206,7 +206,7 @@
                 <h3>⚙️ Настройки</h3>
                 <label class="checkbox-label">
                     <input type="checkbox" id="voiceEnabled" checked>
-                    <span> Голосовое сопровождение (объявления фаз)</span>
+                    <span>🔊 Голосовое сопровождение (объявления фаз)</span>
                 </label>
                 <label class="checkbox-label">
                     <input type="checkbox" id="soundEnabled" checked>
@@ -215,8 +215,8 @@
             </div>
             
             <input type="text" id="playerNameInput" placeholder="Введите ваше имя">
-            <button onclick="createGame()"> Создать игру</button>
-            <button class="btn-secondary" onclick="showJoinScreen()"> Присоединиться к игре</button>
+            <button onclick="createGame()">🎮 Создать игру</button>
+            <button class="btn-secondary" onclick="showJoinScreen()">🔗 Присоединиться к игре</button>
         </div>
 
         <div id="joinScreen" class="screen hidden">
@@ -249,7 +249,7 @@
 
         <div id="gameScreen" class="screen hidden">
             <div class="in-game-settings">
-                <button class="btn-small" onclick="toggleSettings()">️ Настройки</button>
+                <button class="btn-small" onclick="toggleSettings()">⚙️ Настройки</button>
                 <div id="settingsDropdown" class="settings-dropdown">
                     <h3 style="color: #ffd93d; margin-bottom: 10px;">🔊 Звук</h3>
                     <label class="checkbox-label">
@@ -270,7 +270,7 @@
                 <div id="targetSelection" class="target-selection"></div>
             </div>
             <div id="voteSection" class="vote-section hidden">
-                <h3 style="text-align: center; margin-bottom: 15px;">🗳️ Голосование</h3>
+                <h3 style="text-align: center; margin-bottom: 15px;">️ Голосование</h3>
                 <div id="voteButtons"></div>
                 <button onclick="endVoting()" style="margin-top: 15px;">Завершить голосование</button>
             </div>
@@ -315,9 +315,10 @@
         let soundEnabled = true;
         let audioContext = null;
         let audioInitialized = false;
+        let votingPhaseStarted = false; // Локальный флаг для предотвращения повторного запуска
 
         const ROLES = { MAFIA: 'Мафия', CIVILIAN: 'Мирный житель', DOCTOR: 'Доктор', DETECTIVE: 'Детектив' };
-        const ROLE_ICONS = { 'Мафия': '', 'Мирный житель': '', 'Доктор': '💉', 'Детектив': '🔍' };
+        const ROLE_ICONS = { 'Мафия': '🔪', 'Мирный житель': '👤', 'Доктор': '', 'Детектив': '🔍' };
 
         function initAudio() {
             if (audioInitialized) return;
@@ -514,13 +515,14 @@
             if (myPlayerId === game.hostId && game.lastActionAt && game.lastActionAt > lastProcessedActionTime && currentPhaseKey !== lastProcessedPhase) {
                 lastProcessedActionTime = game.lastActionAt;
                 lastProcessedPhase = currentPhaseKey;
-                setTimeout(() => advanceNightPhaseHost(), 3000); // Увеличил до 3 секунд
+                setTimeout(() => advanceNightPhaseHost(), 3000);
             }
             
             // Автоматический переход к голосованию днем (только для хоста)
-            if (myPlayerId === game.hostId && game.phase === 'day' && game.dayStartedAt && !game.votingStarted) {
+            if (myPlayerId === game.hostId && game.phase === 'day' && game.dayStartedAt && !votingPhaseStarted) {
                 const timeSinceDayStart = Date.now() - game.dayStartedAt;
-                if (timeSinceDayStart > 8000) { // Увеличил до 8 секунд
+                if (timeSinceDayStart > 8000) {
+                    votingPhaseStarted = true; // Устанавливаем флаг СРАЗУ
                     startVotingPhase();
                 }
             }
@@ -545,12 +547,12 @@
         }
 
         function updateGameScreen(game) {
-            document.getElementById('myRoleBadge').innerHTML = `Ваша роль: ${ROLE_ICONS[myRole] || ''} ${myRole || 'Неизвестно'}`;
+            document.getElementById('myRoleBadge').innerHTML = `Ваша роль: ${ROLE_ICONS[myRole] || '🎭'} ${myRole || 'Неизвестно'}`;
 
             const phaseEl = document.getElementById('phaseIndicator');
             if (game.phase === 'night') {
                 phaseEl.className = 'phase-indicator phase-night';
-                phaseEl.textContent = `🌙 Ночь ${game.day}`;
+                phaseEl.textContent = ` Ночь ${game.day}`;
             } else if (game.phase === 'day') {
                 phaseEl.className = 'phase-indicator phase-day';
                 phaseEl.textContent = `☀️ День ${game.day}`;
@@ -592,7 +594,7 @@
                     html += `
                         <div class="player-item">
                             <div class="player-name">${p.name}</div>
-                            <div class="player-role" style="color: #888; font-style: italic;">🌙 Спит</div>
+                            <div class="player-role" style="color: #888; font-style: italic;"> Спит</div>
                         </div>
                     `;
                 } else {
@@ -634,13 +636,13 @@
                     const target = Object.values(gameData.players).find(p => p.id === gameData.detectiveVote);
                     const isMafia = target.role === 'Мафия';
                     panel.classList.remove('hidden');
-                    title.textContent = ' Результат проверки';
+                    title.textContent = '🔍 Результат проверки';
                     sel.innerHTML = `<div class="detective-result ${isMafia ? 'result-mafia' : 'result-civilian'}">
                         ${target.name}: ${isMafia ? '🔪 МАФИЯ!' : '✅ Мирный житель'}
                     </div>`;
                     return;
                 }
-                title.textContent = ' Детектив, выберите кого проверить';
+                title.textContent = '🔍 Детектив, выберите кого проверить';
                 targets = Object.values(gameData.players).filter(p => p.alive && p.role !== 'Детектив');
             } else {
                 panel.classList.add('hidden');
@@ -812,7 +814,7 @@
             if (eliminatedPlayer && maxVotes > 0 && !tie) {
                 const player = gameData.players[eliminatedPlayer];
                 await ref.child(`players/${eliminatedPlayer}/alive`).set(false);
-                newLog.push(`️ ${player.name} был исключен (${maxVotes} голосов). Роль: ${player.role}`);
+                newLog.push(`🗳️ ${player.name} был исключен (${maxVotes} голосов). Роль: ${player.role}`);
                 speak(`${player.name} был исключен из игры`);
             } else if (tie) {
                 newLog.push('🗳️ Голоса разделились поровну. Никто не был исключен.');
@@ -833,6 +835,7 @@
                 await ref.update({ phase: 'finished', log: [...newLog, '🔪 Мафия победила!'] });
                 speak('Мафия победила');
             } else {
+                votingPhaseStarted = false; // Сбрасываем флаг для следующей ночи
                 setTimeout(async () => {
                     playSound('night');
                     speak('Наступает ночь');
@@ -893,7 +896,7 @@
                             phase: 'night',
                             day: 1,
                             activeAction: 'mafia',
-                            lastActionAt: firebase.database.ServerValue.TIMESTAMP,
+                            lastActionAt: 0, // ИСПРАВЛЕНИЕ: устанавливаем в 0, чтобы не триггерить advanceNightPhaseHost
                             log: ['🌙 Наступает ночь. Город засыпает.', '🔪 Мафия просыпается']
                         });
                     } catch (e) { console.error(e); }
