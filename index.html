@@ -136,6 +136,7 @@
             color: #eee;
         }
         .vote-button:hover:not(:disabled) { background: rgba(78,205,196,0.4); }
+        .vote-button.selected { background: rgba(255,217,61,0.3); border-color: #ffd93d; }
         .vote-count { display: inline-block; background: #ff6b6b; padding: 5px 10px; border-radius: 5px; margin-left: 10px; }
         .log {
             background: rgba(0,0,0,0.5);
@@ -245,7 +246,7 @@
             <div id="voteSection" class="vote-section hidden">
                 <h3 style="text-align: center; margin-bottom: 15px;">🗳️ Голосование</h3>
                 <div id="voteButtons"></div>
-                <button onclick="endVoting()" style="margin-top: 15px;">Завершить голосование</button>
+                <button id="endVotingBtn" onclick="endVoting()" style="margin-top: 15px;" class="hidden">Завершить голосование (только хост)</button>
             </div>
             <div id="playersList"></div>
             <div id="gameLog" class="log"></div>
@@ -289,10 +290,10 @@
         let audioContext = null;
         let audioInitialized = false;
         let votingTimer = null;
-        let detectiveResultShown = false; // Флаг для показа результата детектива
+        let detectiveResultTimer = null;
 
         const ROLES = { MAFIA: 'Мафия', CIVILIAN: 'Мирный житель', DOCTOR: 'Доктор', DETECTIVE: 'Детектив' };
-        const ROLE_ICONS = { 'Мафия': '🔪', 'Мирный житель': '👤', 'Доктор': '💉', 'Детектив': '🔍' };
+        const ROLE_ICONS = { 'Мафия': '', 'Мирный житель': '👤', 'Доктор': '💉', 'Детектив': '🔍' };
 
         function initAudio() {
             if (audioInitialized) return;
@@ -476,10 +477,12 @@
             }
 
             // АВТОМАТИЧЕСКОЕ ПРОДВИЖЕНИЕ НОЧИ (только для хоста)
-            // ИСПРАВЛЕНИЕ: не продвигаем, если детектив только что сделал выбор и результат еще не показан
+            // ИСПРАВЛЕНИЕ: Не продвигаем если детектив еще не увидел результат
             const currentPhaseKey = `${game.phase}-${game.activeAction || 'none'}`;
+            const detectiveJustVoted = game.activeAction === 'detective' && game.detectiveVote && !game.detectiveResultSeen;
+            
             if (myPlayerId === game.hostId && game.lastActionAt && game.lastActionAt > lastProcessedActionTime && 
-                currentPhaseKey !== lastProcessedPhase && !detectiveResultShown) {
+                currentPhaseKey !== lastProcessedPhase && !detectiveJustVoted) {
                 lastProcessedActionTime = game.lastActionAt;
                 lastProcessedPhase = currentPhaseKey;
                 setTimeout(() => advanceNightPhaseHost(), 3000);
@@ -522,7 +525,7 @@
                 phaseEl.textContent = `🌙 Ночь ${game.day}`;
             } else if (game.phase === 'day') {
                 phaseEl.className = 'phase-indicator phase-day';
-                phaseEl.textContent = `️ День ${game.day}`;
+                phaseEl.textContent = `☀️ День ${game.day}`;
             } else if (game.phase === 'voting') {
                 phaseEl.className = 'phase-indicator phase-day';
                 phaseEl.textContent = `🗳️ Голосование - День ${game.day}`;
@@ -596,39 +599,37 @@
                 title.textContent = '🔪 Мафия, выберите жертву';
                 targets = Object.values(gameData.players).filter(p => p.alive && p.role !== 'Мафия');
             } else if (action === 'doctor' && currentRole === 'Доктор') {
-                title.textContent = ' Доктор, выберите кого спасти';
+                title.textContent = '💉 Доктор, выберите кого спасти';
                 targets = Object.values(gameData.players).filter(p => p.alive);
             } else if (action === 'detective' && currentRole === 'Детектив') {
-                // ИСПРАВЛЕНИЕ: Проверяем detectiveVote И показываем результат
-                if (gameData.detectiveVote && !detectiveResultShown) {
+                // ИСПРАВЛЕНИЕ: Проверяем detectiveResultSeen вместо detectiveResultShown
+                if (gameData.detectiveVote && !gameData.detectiveResultSeen) {
                     const target = Object.values(gameData.players).find(p => p.id === gameData.detectiveVote);
                     if (target) {
                         const isMafia = target.role === 'Мафия';
                         panel.classList.remove('hidden');
-                        title.textContent = ' Результат проверки';
+                        title.textContent = '🔍 Результат проверки';
                         sel.innerHTML = `<div class="detective-result ${isMafia ? 'result-mafia' : 'result-civilian'}">
                             ${target.name}: ${isMafia ? '🔪 МАФИЯ!' : '✅ Мирный житель'}
                         </div>
                         <div class="waiting-message">Запомните результат...</div>`;
                         
                         // Устанавливаем флаг что результат показан
-                        detectiveResultShown = true;
+                        const ref = database.ref(`games/${currentGameId}`);
+                        ref.update({ detectiveResultSeen: true });
                         
-                        // Через 5 секунд скрываем результат и продвигаем игру
-                        setTimeout(async () => {
-                            detectiveResultShown = false;
+                        // Через 5 секунд продвигаем игру
+                        if (detectiveResultTimer) clearTimeout(detectiveResultTimer);
+                        detectiveResultTimer = setTimeout(async () => {
                             panel.classList.add('hidden');
-                            
                             // Обновляем lastActionAt чтобы триггер сработал
-                            const ref = database.ref(`games/${currentGameId}`);
                             await ref.update({ lastActionAt: firebase.database.ServerValue.TIMESTAMP });
                         }, 5000);
                         return;
                     }
                 }
                 
-                // Если еще не выбрали - показываем выбор
-                title.textContent = ' Детектив, выберите кого проверить';
+                title.textContent = '🔍 Детектив, выберите кого проверить';
                 targets = Object.values(gameData.players).filter(p => p.alive && p.role !== 'Детектив');
             } else {
                 panel.classList.add('hidden');
@@ -649,10 +650,17 @@
                 
                 playSound('action');
                 
-                await ref.update({
+                const updates = {
                     [actionKey]: targetId,
                     lastActionAt: firebase.database.ServerValue.TIMESTAMP
-                });
+                };
+                
+                // Для детектива сбрасываем флаг результата
+                if (myRole === 'Детектив') {
+                    updates.detectiveResultSeen = false;
+                }
+                
+                await ref.update(updates);
                 
                 document.getElementById('actionPanel').classList.add('hidden');
             } catch (e) { alert('Ошибка: ' + e.message); }
@@ -678,7 +686,6 @@
             } else if (currentAction === 'doctor') {
                 await advanceToDetectiveOrDay(ref, latestGame);
             } else if (currentAction === 'detective') {
-                // ИСПРАВЛЕНИЕ: Ждем пока детектив увидит результат
                 playSound('day');
                 speak('Ночь закончилась. Наступает день');
                 await ref.update({ 
@@ -750,35 +757,56 @@
             const myPlayer = game.players[myPlayerId];
             section.classList.remove('hidden');
 
-            if (myPlayer.voted) {
-                buttons.innerHTML = '<div class="waiting-message">✅ Вы уже проголосовали. Ожидание остальных...</div>';
-                return;
+            // Показываем кнопку завершения только хосту
+            const endBtn = document.getElementById('endVotingBtn');
+            if (myPlayerId === game.hostId) {
+                endBtn.classList.remove('hidden');
+            } else {
+                endBtn.classList.add('hidden');
             }
+
             if (!myPlayer.alive) {
-                buttons.innerHTML = '<div class="waiting-message">💀 Вы не можете голосовать</div>';
+                buttons.innerHTML = '<div class="waiting-message"> Вы не можете голосовать</div>';
                 return;
             }
 
             const alive = Object.values(game.players).filter(p => p.alive);
-            buttons.innerHTML = alive.map(p => `
-                <button class="vote-button" onclick="castVote('${p.id}')">
-                    ${p.name}
-                    <span class="vote-count">${(game.votes && game.votes[p.id]) || 0}</span>
-                </button>
-            `).join('');
+            buttons.innerHTML = alive.map(p => {
+                const isSelected = myPlayer.voted === p.id;
+                return `
+                    <button class="vote-button ${isSelected ? 'selected' : ''}" onclick="castVote('${p.id}')">
+                        ${p.name}
+                        <span class="vote-count">${(game.votes && game.votes[p.id]) || 0}</span>
+                    </button>
+                `;
+            }).join('');
         }
 
         async function castVote(targetId) {
             try {
-                if (gameData.players[myPlayerId].voted) return;
                 const ref = database.ref(`games/${currentGameId}`);
+                const myPlayer = gameData.players[myPlayerId];
+                
+                // Если уже голосовал за другого, уменьшаем счетчик
+                if (myPlayer.voted && myPlayer.voted !== targetId) {
+                    await ref.child(`votes/${myPlayer.voted}`).transaction(c => Math.max(0, (c || 1) - 1));
+                }
+                
+                // Устанавливаем новый голос
                 await ref.child(`players/${myPlayerId}/voted`).set(targetId);
                 await ref.child(`votes/${targetId}`).transaction(c => (c || 0) + 1);
+                
+                playSound('action');
             } catch (e) { alert('Ошибка: ' + e.message); }
         }
 
         async function endVoting() {
+            // ИСПРАВЛЕНИЕ: Только хост может завершить голосование
             if (gameData.phase !== 'voting') return;
+            if (myPlayerId !== gameData.hostId) {
+                alert('Только хост может завершить голосование!');
+                return;
+            }
             
             const ref = database.ref(`games/${currentGameId}`);
             let maxVotes = 0;
@@ -806,7 +834,7 @@
                 newLog.push(`🗳️ ${player.name} был исключен (${maxVotes} голосов). Роль: ${player.role}`);
                 speak(`${player.name} был исключен из игры`);
             } else if (tie) {
-                newLog.push('️ Голоса разделились поровну. Никто не был исключен.');
+                newLog.push('🗳️ Голоса разделились поровну. Никто не был исключен.');
                 speak('Голоса разделились поровну');
             } else {
                 newLog.push('Никто не был исключен');
@@ -834,9 +862,10 @@
                         mafiaVote: null,
                         doctorVote: null,
                         detectiveVote: null,
+                        detectiveResultSeen: false,
                         votes: {},
                         lastActionAt: 0,
-                        log: [...newLog, ` Ночь ${game.day + 1}`, '🔪 Мафия просыпается']
+                        log: [...newLog, `🌙 Ночь ${game.day + 1}`, '🔪 Мафия просыпается']
                     });
                 }, 5000);
             }
@@ -844,7 +873,7 @@
 
         function showFinalResults(game) {
             const mafiaCount = Object.values(game.players).filter(p => p.role === 'Мафия' && p.alive).length;
-            document.getElementById('winnerTitle').textContent = mafiaCount === 0 ? 'Мирные жители победили! 🎉' : 'Мафия победила! ';
+            document.getElementById('winnerTitle').textContent = mafiaCount === 0 ? 'Мирные жители победили! 🎉' : 'Мафия победила! 🔪';
             document.getElementById('finalRoles').innerHTML = Object.values(game.players).map(p => `
                 <div class="player-item">
                     <div>
@@ -885,6 +914,7 @@
                             day: 1,
                             activeAction: 'mafia',
                             lastActionAt: 0,
+                            detectiveResultSeen: false,
                             log: ['🌙 Наступает ночь. Город засыпает.', '🔪 Мафия просыпается']
                         });
                         setTimeout(() => {
