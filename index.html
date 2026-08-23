@@ -253,17 +253,6 @@
             font-style: italic;
         }
 
-        .debug-info {
-            background: rgba(255,255,0,0.1);
-            border: 1px solid #ffd93d;
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 5px;
-            font-size: 0.9em;
-            font-family: monospace;
-            word-break: break-all;
-        }
-
         @media (max-width: 600px) {
             h1 { font-size: 2em; }
             .game-code { font-size: 2em; }
@@ -302,7 +291,6 @@
                 <button id="startGameBtn" onclick="startGame()">🎲 Начать игру</button>
             </div>
             <div class="waiting-message">Ожидание других игроков...</div>
-            <div id="debugInfo" class="debug-info hidden"></div>
         </div>
 
         <!-- Экран роли -->
@@ -378,6 +366,7 @@
 
 };
 
+
         // Инициализация Firebase
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
@@ -398,10 +387,10 @@
         };
 
         const ROLE_ICONS = {
-            [ROLES.MAFIA]: '🔪',
+            [ROLES.MAFIA]: '',
             [ROLES.CIVILIAN]: '',
             [ROLES.DOCTOR]: '',
-            [ROLES.DETECTIVE]: '🔍'
+            [ROLES.DETECTIVE]: ''
         };
 
         // ========== АУТЕНТИФИКАЦИЯ И ИГРЫ ==========
@@ -414,12 +403,9 @@
             }
 
             try {
-                // Анонимная авторизация
                 const userCredential = await auth.signInAnonymously();
                 myPlayerId = userCredential.user.uid;
-                console.log('Auth success, UID:', myPlayerId);
 
-                // Создание игры
                 const gameCode = generateGameCode();
                 currentGameId = gameCode;
 
@@ -428,21 +414,20 @@
                     hostId: myPlayerId,
                     phase: 'waiting',
                     day: 1,
-                    players: {
-                        [myPlayerId]: {
-                            id: myPlayerId,
-                            name: playerName,
-                            role: null,
-                            alive: true,
-                            voted: null,
-                            isHost: true
-                        }
-                    },
+                    players: {},
                     createdAt: firebase.database.ServerValue.TIMESTAMP
+                };
+                
+                gameData.players[myPlayerId] = {
+                    id: myPlayerId,
+                    name: playerName,
+                    role: null,
+                    alive: true,
+                    voted: null,
+                    isHost: true
                 };
 
                 await database.ref(`games/${gameCode}`).set(gameData);
-                console.log('Game created:', gameCode);
                 
                 showWaitingScreen(gameCode);
                 setupGameListener(gameCode);
@@ -464,7 +449,6 @@
             try {
                 const userCredential = await auth.signInAnonymously();
                 myPlayerId = userCredential.user.uid;
-                console.log('Auth success, UID:', myPlayerId);
 
                 const gameRef = database.ref(`games/${gameCode}`);
                 const snapshot = await gameRef.once('value');
@@ -485,15 +469,16 @@
                     return;
                 }
 
-                // Добавление игрока
-                await gameRef.child(`players/${myPlayerId}`).set({
+                const playerData = {
                     id: myPlayerId,
                     name: playerName,
                     role: null,
                     alive: true,
                     voted: null,
                     isHost: false
-                });
+                };
+
+                await gameRef.child(`players/${myPlayerId}`).set(playerData);
 
                 currentGameId = gameCode;
                 showWaitingScreen(gameCode);
@@ -552,12 +537,8 @@
             
             gameListener = gameRef.on('value', (snapshot) => {
                 const game = snapshot.val();
-                if (!game) {
-                    console.log('Game data is null');
-                    return;
-                }
+                if (!game) return;
 
-                console.log('Game data updated:', game);
                 gameData = game;
                 const myPlayer = game.players[myPlayerId];
 
@@ -571,29 +552,22 @@
 
         function updateUI(game) {
             const myPlayer = game.players[myPlayerId];
-            if (!myPlayer) {
-                console.log('Player not found in game');
-                return;
-            }
+            if (!myPlayer) return;
 
-            // Обновление списка игроков на экране ожидания
             if (game.phase === 'waiting') {
                 updateWaitingPlayerList(game.players);
             }
 
-            // Показ роли
             if (game.phase === 'role_reveal' && myPlayer.role) {
                 showRoleScreen();
                 displayRole(myPlayer.role);
             }
 
-            // Игровой процесс
             if (game.phase === 'night' || game.phase === 'day' || game.phase === 'voting') {
                 showGameScreen();
                 updateGameScreen(game);
             }
 
-            // Конец игры
             if (game.phase === 'finished') {
                 showWinnerScreen();
                 showFinalResults(game);
@@ -611,7 +585,6 @@
                 </div>
             `).join('');
 
-            // Показать кнопку начала для хоста
             if (myPlayerId === gameData.hostId) {
                 document.getElementById('hostControls').classList.remove('hidden');
             }
@@ -636,30 +609,25 @@
         function updateGameScreen(game) {
             const myPlayer = game.players[myPlayerId];
             
-            // Обновление индикатора фазы
             const phaseEl = document.getElementById('phaseIndicator');
             if (game.phase === 'night') {
                 phaseEl.className = 'phase-indicator phase-night';
-                phaseEl.textContent = `🌙 Ночь ${game.day}`;
+                phaseEl.textContent = ` Ночь ${game.day}`;
             } else if (game.phase === 'day') {
                 phaseEl.className = 'phase-indicator phase-day';
                 phaseEl.textContent = `☀️ День ${game.day}`;
             }
 
-            // Обновление списка игроков
             updatePlayersList(game.players);
 
-            // Действия для специальных ролей
             if (game.phase === 'night' && game.activeAction) {
                 handleNightAction(game.activeAction, myPlayer);
             }
 
-            // Голосование
             if (game.phase === 'voting') {
                 showVotingSection(game);
             }
 
-            // Лог
             if (game.log) {
                 updateLog(game.log);
             }
@@ -691,7 +659,7 @@
                 title = '🔪 Мафия, выберите жертву';
                 targets = Object.values(gameData.players).filter(p => p.alive && p.role !== ROLES.MAFIA);
             } else if (action === 'doctor' && myPlayer.role === ROLES.DOCTOR) {
-                title = '💉 Доктор, выберите кого спасти';
+                title = ' Доктор, выберите кого спасти';
                 targets = Object.values(gameData.players).filter(p => p.alive);
             } else if (action === 'detective' && myPlayer.role === ROLES.DETECTIVE) {
                 title = '🔍 Детектив, выберите кого проверить';
@@ -722,7 +690,6 @@
                 }
                 
                 document.getElementById('actionPanel').classList.add('hidden');
-                console.log('Night action performed:', targetId);
             } catch (error) {
                 console.error('Error performing night action:', error);
                 alert('Ошибка: ' + error.message);
@@ -755,7 +722,6 @@
                 </button>
             `).join('');
 
-            // Обновление счетчиков голосов
             if (game.votes) {
                 Object.entries(game.votes).forEach(([playerId, count]) => {
                     const el = document.getElementById(`vote-${playerId}`);
@@ -771,7 +737,6 @@
                 const gameRef = database.ref(`games/${currentGameId}`);
                 await gameRef.child(`players/${myPlayerId}/voted`).set(targetId);
                 await gameRef.child(`votes/${targetId}`).transaction(count => (count || 0) + 1);
-                console.log('Vote cast for:', targetId);
             } catch (error) {
                 console.error('Error casting vote:', error);
                 alert('Ошибка голосования: ' + error.message);
@@ -791,7 +756,7 @@
             const winnerTitle = document.getElementById('winnerTitle');
             
             const mafiaCount = Object.values(game.players).filter(p => p.role === ROLES.MAFIA && p.alive).length;
-            const winner = mafiaCount === 0 ? 'Мирные жители победили! 🎉' : 'Мафия победила! 🔪';
+            const winner = mafiaCount === 0 ? 'Мирные жители победили! 🎉' : 'Мафия победила! ';
             
             winnerTitle.textContent = winner;
             
@@ -809,11 +774,6 @@
         // ========== УПРАВЛЕНИЕ ИГРОЙ (ХОСТ) ==========
 
         async function startGame() {
-            console.log('startGame called');
-            console.log('myPlayerId:', myPlayerId);
-            console.log('gameData:', gameData);
-            console.log('gameData.hostId:', gameData?.hostId);
-
             if (!gameData) {
                 alert('Данные игры не загружены!');
                 return;
@@ -825,8 +785,6 @@
             }
 
             const playerCount = Object.keys(gameData.players).length;
-            console.log('Player count:', playerCount);
-
             if (playerCount < 4) {
                 alert('Нужно минимум 4 игрока!');
                 return;
@@ -834,25 +792,19 @@
 
             try {
                 const gameRef = database.ref(`games/${currentGameId}`);
-                
-                // Раздача ролей
                 const roles = distributeRoles(playerCount);
                 const players = Object.keys(gameData.players);
                 
-                console.log('Distributing roles:', roles);
-                
-                const updates = {
-                    phase: 'role_reveal',
-                    players: {}
-                };
-
+                // ИСПРАВЛЕНИЕ: обновляем каждого игрока отдельно
+                const updates = {};
                 players.forEach((playerId, index) => {
-                    updates.players[`${playerId}/role`] = roles[index];
+                    updates[`players/${playerId}/role`] = roles[index];
                 });
-
-                console.log('Updates:', updates);
-                await gameRef.update(updates);
-                console.log('Game phase updated to role_reveal');
+                
+                await gameRef.update({
+                    phase: 'role_reveal',
+                    ...updates
+                });
 
                 // Через 15 секунд начинаем первую ночь
                 setTimeout(async () => {
@@ -863,7 +815,6 @@
                             activeAction: 'mafia',
                             log: ['=== Ночь 1 ===', 'Мафия просыпается']
                         });
-                        console.log('Game started: night phase');
                     } catch (error) {
                         console.error('Error starting night:', error);
                     }
@@ -892,21 +843,11 @@
             return roles.sort(() => Math.random() - 0.5);
         }
 
-        // Очистка при выходе
         window.addEventListener('beforeunload', () => {
             if (gameListener && currentGameId) {
                 database.ref(`games/${currentGameId}`).off('value', gameListener);
             }
         });
-
-        // Debug: показать информацию на экране
-        setInterval(() => {
-            const debugEl = document.getElementById('debugInfo');
-            if (debugEl && gameData) {
-                debugEl.textContent = `Phase: ${gameData.phase}, Players: ${Object.keys(gameData.players).length}, Host: ${gameData.hostId === myPlayerId}`;
-                debugEl.classList.remove('hidden');
-            }
-        }, 2000);
     </script>
 </body>
 </html>
