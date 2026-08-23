@@ -31,7 +31,7 @@
             margin-bottom: 20px;
         }
         .hidden { display: none !important; }
-        input[type="text"] {
+        input[type="text"], input[type="checkbox"] {
             width: 100%;
             padding: 15px;
             border: 2px solid #ffd93d;
@@ -40,6 +40,17 @@
             color: #eee;
             font-size: 1.1em;
             margin-bottom: 15px;
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        .checkbox-label input {
+            width: auto;
+            margin: 0;
         }
         button {
             background: linear-gradient(45deg, #ff6b6b, #ee5a6f);
@@ -145,6 +156,17 @@
         .detective-result { font-size: 1.8em; padding: 20px; border-radius: 10px; margin: 10px 0; font-weight: bold; }
         .result-mafia { background: rgba(255,107,107,0.3); color: #ff6b6b; border: 2px solid #ff6b6b; }
         .result-civilian { background: rgba(78,205,196,0.3); color: #4ecdc4; border: 2px solid #4ecdc4; }
+        .settings-panel {
+            background: rgba(255,217,61,0.1);
+            border: 1px solid #ffd93d;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .settings-panel h3 {
+            color: #ffd93d;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -153,6 +175,19 @@
         
         <div id="menuScreen" class="screen">
             <h2 style="text-align: center; margin-bottom: 20px;">Добро пожаловать!</h2>
+            
+            <div class="settings-panel">
+                <h3>⚙️ Настройки</h3>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="voiceEnabled" checked>
+                    <span>🔊 Голосовое сопровождение (объявления фаз)</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="soundEnabled" checked>
+                    <span>🔔 Звуковые эффекты</span>
+                </label>
+            </div>
+            
             <input type="text" id="playerNameInput" placeholder="Введите ваше имя">
             <button onclick="createGame()">🎮 Создать игру</button>
             <button class="btn-secondary" onclick="showJoinScreen()">🔗 Присоединиться к игре</button>
@@ -233,9 +268,76 @@
         let gameData = null;
         let gameListener = null;
         let lastProcessedActionTime = 0;
+        let voiceEnabled = true;
+        let soundEnabled = true;
+        let audioContext = null;
 
         const ROLES = { MAFIA: 'Мафия', CIVILIAN: 'Мирный житель', DOCTOR: 'Доктор', DETECTIVE: 'Детектив' };
         const ROLE_ICONS = { 'Мафия': '🔪', 'Мирный житель': '👤', 'Доктор': '💉', 'Детектив': '🔍' };
+
+        // Инициализация аудио
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // Воспроизведение звука
+        function playSound(type) {
+            if (!soundEnabled) return;
+            initAudio();
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            switch(type) {
+                case 'night':
+                    oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 1);
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 1);
+                    break;
+                case 'day':
+                    oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(600, audioContext.currentTime + 0.5);
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.5);
+                    break;
+                case 'wake':
+                    oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(500, audioContext.currentTime + 0.3);
+                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.3);
+                    break;
+                case 'action':
+                    oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.1);
+                    break;
+            }
+        }
+
+        // Голосовое объявление
+        function speak(text) {
+            if (!voiceEnabled || !window.speechSynthesis) return;
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'ru-RU';
+            utterance.rate = 0.9;
+            utterance.pitch = 1;
+            speechSynthesis.speak(utterance);
+        }
 
         function showMenuScreen() { hideAllScreens(); document.getElementById('menuScreen').classList.remove('hidden'); }
         function showJoinScreen() { hideAllScreens(); document.getElementById('joinScreen').classList.remove('hidden'); }
@@ -248,6 +350,10 @@
         async function createGame() {
             const playerName = document.getElementById('playerNameInput').value.trim();
             if (!playerName) { alert('Введите имя!'); return; }
+            
+            voiceEnabled = document.getElementById('voiceEnabled').checked;
+            soundEnabled = document.getElementById('soundEnabled').checked;
+            
             try {
                 const cred = await auth.signInAnonymously();
                 myPlayerId = cred.user.uid;
@@ -268,6 +374,10 @@
             const gameCode = document.getElementById('gameCodeInput').value.trim().toUpperCase();
             const playerName = document.getElementById('joinNameInput').value.trim();
             if (!gameCode || !playerName) { alert('Введите код и имя!'); return; }
+            
+            voiceEnabled = document.getElementById('voiceEnabled').checked;
+            soundEnabled = document.getElementById('soundEnabled').checked;
+            
             try {
                 const cred = await auth.signInAnonymously();
                 myPlayerId = cred.user.uid;
@@ -321,7 +431,7 @@
             // АВТОМАТИЧЕСКОЕ ПРОДВИЖЕНИЕ НОЧИ (только для хоста)
             if (myPlayerId === game.hostId && game.lastActionAt && game.lastActionAt > lastProcessedActionTime) {
                 lastProcessedActionTime = game.lastActionAt;
-                setTimeout(() => advanceNightPhaseHost(), 2000); // 2 секунды задержка для драматизма
+                setTimeout(() => advanceNightPhaseHost(), 2000);
             }
         }
 
@@ -344,7 +454,6 @@
         }
 
         function updateGameScreen(game) {
-            // Бейдж с ролью игрока
             document.getElementById('myRoleBadge').innerHTML = `Ваша роль: ${ROLE_ICONS[myRole] || '🎭'} ${myRole || 'Неизвестно'}`;
 
             const phaseEl = document.getElementById('phaseIndicator');
@@ -361,21 +470,18 @@
 
             renderPlayerList(game);
 
-            // Ночные действия
             if (game.phase === 'night' && game.activeAction) {
                 handleNightAction(game.activeAction, game.players[myPlayerId]);
             } else {
                 document.getElementById('actionPanel').classList.add('hidden');
             }
 
-            // Голосование
             if (game.phase === 'voting') {
                 showVotingSection(game);
             } else {
                 document.getElementById('voteSection').classList.add('hidden');
             }
 
-            // Лог
             if (game.log) {
                 const logEl = document.getElementById('gameLog');
                 const logArray = Array.isArray(game.log) ? game.log : [game.log];
@@ -392,7 +498,7 @@
             let html = '';
             Object.values(game.players).forEach(p => {
                 if (isNight) {
-                    // НОЧЬЮ: скрываем роли и статусы жизни/смерти!
+                    // НОЧЬЮ: ВСЕ видят только имена и " Спит"
                     html += `
                         <div class="player-item">
                             <div class="player-name">${p.name}</div>
@@ -425,7 +531,6 @@
             const sel = document.getElementById('targetSelection');
             const title = document.getElementById('actionTitle');
 
-            // Используем глобальную myRole для надежности
             const currentRole = myRole || myPlayer.role;
             let targets = [];
 
@@ -436,7 +541,6 @@
                 title.textContent = '💉 Доктор, выберите кого спасти';
                 targets = Object.values(gameData.players).filter(p => p.alive);
             } else if (action === 'detective' && currentRole === 'Детектив') {
-                // Если детектив уже проголосовал, показываем ему результат
                 if (gameData.detectiveVote) {
                     const target = Object.values(gameData.players).find(p => p.id === gameData.detectiveVote);
                     const isMafia = target.role === 'Мафия';
@@ -465,21 +569,21 @@
                 const ref = database.ref(`games/${currentGameId}`);
                 const actionKey = myRole === 'Мафия' ? 'mafiaVote' : (myRole === 'Доктор' ? 'doctorVote' : 'detectiveVote');
                 
+                playSound('action');
+                
                 await ref.update({
                     [actionKey]: targetId,
-                    lastActionAt: firebase.database.ServerValue.TIMESTAMP // Сигнал хосту продвинуть игру
+                    lastActionAt: firebase.database.ServerValue.TIMESTAMP
                 });
                 
                 document.getElementById('actionPanel').classList.add('hidden');
             } catch (e) { alert('Ошибка: ' + e.message); }
         }
 
-        // ЛОГИКА ХОСТА ДЛЯ ПРОДВИЖЕНИЯ НОЧИ
         async function advanceNightPhaseHost() {
             const ref = database.ref(`games/${currentGameId}`);
             const currentAction = gameData.activeAction;
             
-            // Получаем самые свежие данные
             const snap = await ref.once('value');
             const latestGame = snap.val();
             const currentLog = Array.isArray(latestGame.log) ? latestGame.log : (latestGame.log ? [latestGame.log] : []);
@@ -487,6 +591,8 @@
             if (currentAction === 'mafia') {
                 const hasDoctor = Object.values(latestGame.players).some(p => p.role === 'Доктор' && p.alive);
                 if (hasDoctor) {
+                    playSound('wake');
+                    speak('Просыпается доктор');
                     await ref.update({ activeAction: 'doctor', log: [...currentLog, '💉 Доктор просыпается'] });
                 } else {
                     await advanceToDetectiveOrDay(ref, latestGame);
@@ -494,6 +600,8 @@
             } else if (currentAction === 'doctor') {
                 await advanceToDetectiveOrDay(ref, latestGame);
             } else if (currentAction === 'detective') {
+                playSound('day');
+                speak('Ночь закончилась. Наступает день');
                 await ref.update({ 
                     activeAction: null, 
                     phase: 'day', 
@@ -507,12 +615,16 @@
             const hasDetective = Object.values(latestGame.players).some(p => p.role === 'Детектив' && p.alive);
             
             if (hasDetective) {
+                playSound('wake');
+                speak('Просыпается детектив');
                 await ref.update({ activeAction: 'detective', log: [...currentLog, '🔍 Детектив просыпается'] });
             } else {
+                playSound('day');
+                speak('Ночь закончилась. Наступает день');
                 await ref.update({ 
                     activeAction: null, 
                     phase: 'day', 
-                    log: [...currentLog, '☀️ Ночь закончилась. Город просыпается.'] 
+                    log: [...currentLog, '️ Ночь закончилась. Город просыпается.'] 
                 });
             }
         }
@@ -552,7 +664,7 @@
 
         function showFinalResults(game) {
             const mafiaCount = Object.values(game.players).filter(p => p.role === 'Мафия' && p.alive).length;
-            document.getElementById('winnerTitle').textContent = mafiaCount === 0 ? 'Мирные жители победили! 🎉' : 'Мафия победила! 🔪';
+            document.getElementById('winnerTitle').textContent = mafiaCount === 0 ? 'Мирные жители победили! ' : 'Мафия победила! 🔪';
             document.getElementById('finalRoles').innerHTML = Object.values(game.players).map(p => `
                 <div class="player-item">
                     <div>
@@ -570,6 +682,9 @@
             const playerCount = Object.keys(gameData.players).length;
             if (playerCount < 4) { alert('Нужно минимум 4 игрока!'); return; }
 
+            voiceEnabled = document.getElementById('voiceEnabled').checked;
+            soundEnabled = document.getElementById('soundEnabled').checked;
+
             try {
                 const ref = database.ref(`games/${currentGameId}`);
                 const roles = distributeRoles(playerCount);
@@ -580,9 +695,10 @@
                     await ref.child(`players/${players[i]}/role`).set(roles[i]);
                 }
 
-                // Через 15 секунд — первая ночь
                 setTimeout(async () => {
                     try {
+                        playSound('night');
+                        speak('Наступает ночь. Город засыпает');
                         await ref.update({
                             phase: 'night',
                             day: 1,
