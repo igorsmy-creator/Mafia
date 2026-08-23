@@ -66,6 +66,12 @@
         }
         button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(255,107,107,0.4); }
         .btn-secondary { background: linear-gradient(45deg, #4ecdc4, #44a3aa); }
+        .btn-small {
+            padding: 10px 15px;
+            font-size: 0.9em;
+            width: auto;
+            margin: 5px;
+        }
         .game-code {
             text-align: center;
             font-size: 3em;
@@ -167,6 +173,26 @@
             color: #ffd93d;
             margin-bottom: 10px;
         }
+        .in-game-settings {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+        }
+        .settings-dropdown {
+            position: absolute;
+            right: 0;
+            top: 40px;
+            background: rgba(0,0,0,0.9);
+            border: 2px solid #ffd93d;
+            border-radius: 10px;
+            padding: 15px;
+            min-width: 250px;
+            display: none;
+        }
+        .settings-dropdown.show {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -189,8 +215,8 @@
             </div>
             
             <input type="text" id="playerNameInput" placeholder="Введите ваше имя">
-            <button onclick="createGame()">🎮 Создать игру</button>
-            <button class="btn-secondary" onclick="showJoinScreen()">🔗 Присоединиться к игре</button>
+            <button onclick="createGame()"> Создать игру</button>
+            <button class="btn-secondary" onclick="showJoinScreen()"> Присоединиться к игре</button>
         </div>
 
         <div id="joinScreen" class="screen hidden">
@@ -222,6 +248,21 @@
         </div>
 
         <div id="gameScreen" class="screen hidden">
+            <div class="in-game-settings">
+                <button class="btn-small" onclick="toggleSettings()">⚙️ Настройки</button>
+                <div id="settingsDropdown" class="settings-dropdown">
+                    <h3 style="color: #ffd93d; margin-bottom: 10px;">🔊 Звук</h3>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="gameVoiceEnabled" checked onchange="updateSoundSettings()">
+                        <span>Голосовое сопровождение</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="gameSoundEnabled" checked onchange="updateSoundSettings()">
+                        <span>Звуковые эффекты</span>
+                    </label>
+                </div>
+            </div>
+            
             <div id="myRoleBadge" class="my-role-badge"></div>
             <div id="phaseIndicator" class="phase-indicator"></div>
             <div id="actionPanel" class="action-panel hidden">
@@ -231,6 +272,7 @@
             <div id="voteSection" class="vote-section hidden">
                 <h3 style="text-align: center; margin-bottom: 15px;">🗳️ Голосование</h3>
                 <div id="voteButtons"></div>
+                <button onclick="endVoting()" style="margin-top: 15px;">Завершить голосование</button>
             </div>
             <div id="playersList"></div>
             <div id="gameLog" class="log"></div>
@@ -271,60 +313,68 @@
         let voiceEnabled = true;
         let soundEnabled = true;
         let audioContext = null;
+        let audioInitialized = false;
 
         const ROLES = { MAFIA: 'Мафия', CIVILIAN: 'Мирный житель', DOCTOR: 'Доктор', DETECTIVE: 'Детектив' };
         const ROLE_ICONS = { 'Мафия': '🔪', 'Мирный житель': '👤', 'Доктор': '💉', 'Детектив': '🔍' };
 
-        // Инициализация аудио
+        // Инициализация аудио (требуется взаимодействие пользователя)
         function initAudio() {
-            if (!audioContext) {
+            if (audioInitialized) return;
+            try {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                audioInitialized = true;
+            } catch(e) {
+                console.error('Audio init failed:', e);
             }
         }
 
         // Воспроизведение звука
         function playSound(type) {
-            if (!soundEnabled) return;
-            initAudio();
+            if (!soundEnabled || !audioContext) return;
             
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            switch(type) {
-                case 'night':
-                    oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
-                    oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 1);
-                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
-                    oscillator.start(audioContext.currentTime);
-                    oscillator.stop(audioContext.currentTime + 1);
-                    break;
-                case 'day':
-                    oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
-                    oscillator.frequency.exponentialRampToValueAtTime(600, audioContext.currentTime + 0.5);
-                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-                    oscillator.start(audioContext.currentTime);
-                    oscillator.stop(audioContext.currentTime + 0.5);
-                    break;
-                case 'wake':
-                    oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
-                    oscillator.frequency.exponentialRampToValueAtTime(500, audioContext.currentTime + 0.3);
-                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-                    oscillator.start(audioContext.currentTime);
-                    oscillator.stop(audioContext.currentTime + 0.3);
-                    break;
-                case 'action':
-                    oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
-                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-                    oscillator.start(audioContext.currentTime);
-                    oscillator.stop(audioContext.currentTime + 0.1);
-                    break;
+            try {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                switch(type) {
+                    case 'night':
+                        oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+                        oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 1);
+                        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 1);
+                        break;
+                    case 'day':
+                        oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+                        oscillator.frequency.exponentialRampToValueAtTime(600, audioContext.currentTime + 0.5);
+                        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.5);
+                        break;
+                    case 'wake':
+                        oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
+                        oscillator.frequency.exponentialRampToValueAtTime(500, audioContext.currentTime + 0.3);
+                        gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.3);
+                        break;
+                    case 'action':
+                        oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+                        gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.1);
+                        break;
+                }
+            } catch(e) {
+                console.error('Sound play failed:', e);
             }
         }
 
@@ -332,18 +382,49 @@
         function speak(text) {
             if (!voiceEnabled || !window.speechSynthesis) return;
             
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'ru-RU';
-            utterance.rate = 0.9;
-            utterance.pitch = 1;
-            speechSynthesis.speak(utterance);
+            try {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'ru-RU';
+                utterance.rate = 0.9;
+                utterance.pitch = 1;
+                speechSynthesis.speak(utterance);
+            } catch(e) {
+                console.error('Speech failed:', e);
+            }
         }
 
-        function showMenuScreen() { hideAllScreens(); document.getElementById('menuScreen').classList.remove('hidden'); }
+        function toggleSettings() {
+            const dropdown = document.getElementById('settingsDropdown');
+            dropdown.classList.toggle('show');
+        }
+
+        function updateSoundSettings() {
+            voiceEnabled = document.getElementById('gameVoiceEnabled').checked;
+            soundEnabled = document.getElementById('gameSoundEnabled').checked;
+            
+            // Синхронизация с главными настройками
+            const menuVoice = document.getElementById('voiceEnabled');
+            const menuSound = document.getElementById('soundEnabled');
+            if (menuVoice) menuVoice.checked = voiceEnabled;
+            if (menuSound) menuSound.checked = soundEnabled;
+        }
+
+        function showMenuScreen() { 
+            hideAllScreens(); 
+            document.getElementById('menuScreen').classList.remove('hidden'); 
+            // Закрыть dropdown если открыт
+            document.getElementById('settingsDropdown')?.classList.remove('show');
+        }
         function showJoinScreen() { hideAllScreens(); document.getElementById('joinScreen').classList.remove('hidden'); }
         function showWaitingScreen(gameCode) { hideAllScreens(); document.getElementById('waitingScreen').classList.remove('hidden'); document.getElementById('displayGameCode').textContent = gameCode; }
         function showRoleScreen() { hideAllScreens(); document.getElementById('roleScreen').classList.remove('hidden'); }
-        function showGameScreen() { hideAllScreens(); document.getElementById('gameScreen').classList.remove('hidden'); }
+        function showGameScreen() { 
+            hideAllScreens(); 
+            document.getElementById('gameScreen').classList.remove('hidden');
+            // Обновить настройки в игре
+            document.getElementById('gameVoiceEnabled').checked = voiceEnabled;
+            document.getElementById('gameSoundEnabled').checked = soundEnabled;
+        }
         function showWinnerScreen() { hideAllScreens(); document.getElementById('winnerScreen').classList.remove('hidden'); }
         function hideAllScreens() { document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden')); }
 
@@ -353,6 +434,9 @@
             
             voiceEnabled = document.getElementById('voiceEnabled').checked;
             soundEnabled = document.getElementById('soundEnabled').checked;
+            
+            // Инициализация аудио при первом взаимодействии
+            initAudio();
             
             try {
                 const cred = await auth.signInAnonymously();
@@ -377,6 +461,8 @@
             
             voiceEnabled = document.getElementById('voiceEnabled').checked;
             soundEnabled = document.getElementById('soundEnabled').checked;
+            
+            initAudio();
             
             try {
                 const cred = await auth.signInAnonymously();
@@ -433,6 +519,14 @@
                 lastProcessedActionTime = game.lastActionAt;
                 setTimeout(() => advanceNightPhaseHost(), 2000);
             }
+            
+            // Автоматический переход к голосованию днем (только для хоста)
+            if (myPlayerId === game.hostId && game.phase === 'day' && game.dayStartedAt) {
+                const timeSinceDayStart = Date.now() - game.dayStartedAt;
+                if (timeSinceDayStart > 5000 && !game.votingStarted) {
+                    startVotingPhase();
+                }
+            }
         }
 
         function updateWaitingList(players) {
@@ -463,9 +557,9 @@
             } else if (game.phase === 'day') {
                 phaseEl.className = 'phase-indicator phase-day';
                 phaseEl.textContent = `☀️ День ${game.day}`;
-            } else {
+            } else if (game.phase === 'voting') {
                 phaseEl.className = 'phase-indicator phase-day';
-                phaseEl.textContent = `🗳️ Голосование - День ${game.day}`;
+                phaseEl.textContent = `️ Голосование - День ${game.day}`;
             }
 
             renderPlayerList(game);
@@ -498,7 +592,6 @@
             let html = '';
             Object.values(game.players).forEach(p => {
                 if (isNight) {
-                    // НОЧЬЮ: ВСЕ видят только имена и " Спит"
                     html += `
                         <div class="player-item">
                             <div class="player-name">${p.name}</div>
@@ -506,7 +599,6 @@
                         </div>
                     `;
                 } else {
-                    // ДНЕМ: показываем статус. Роль видна только мертвым, себе или в конце игры.
                     const isMe = p.id === myPlayerId;
                     let roleDisplay = '?';
                     if (isFinished || !p.alive || isMe) {
@@ -547,7 +639,7 @@
                     panel.classList.remove('hidden');
                     title.textContent = '🔍 Результат проверки';
                     sel.innerHTML = `<div class="detective-result ${isMafia ? 'result-mafia' : 'result-civilian'}">
-                        ${target.name}: ${isMafia ? '🔪 МАФИЯ!' : '✅ Мирный житель'}
+                        ${target.name}: ${isMafia ? ' МАФИЯ!' : '✅ Мирный житель'}
                     </div>`;
                     return;
                 }
@@ -566,6 +658,7 @@
 
         async function performNightAction(targetId) {
             try {
+                initAudio();
                 const ref = database.ref(`games/${currentGameId}`);
                 const actionKey = myRole === 'Мафия' ? 'mafiaVote' : (myRole === 'Доктор' ? 'doctorVote' : 'detectiveVote');
                 
@@ -604,7 +697,9 @@
                 speak('Ночь закончилась. Наступает день');
                 await ref.update({ 
                     activeAction: null, 
-                    phase: 'day', 
+                    phase: 'day',
+                    dayStartedAt: Date.now(),
+                    votingStarted: false,
                     log: [...currentLog, '☀️ Ночь закончилась. Город просыпается.'] 
                 });
             }
@@ -617,15 +712,49 @@
             if (hasDetective) {
                 playSound('wake');
                 speak('Просыпается детектив');
-                await ref.update({ activeAction: 'detective', log: [...currentLog, '🔍 Детектив просыпается'] });
+                await ref.update({ activeAction: 'detective', log: [...currentLog, ' Детектив просыпается'] });
             } else {
                 playSound('day');
                 speak('Ночь закончилась. Наступает день');
                 await ref.update({ 
                     activeAction: null, 
-                    phase: 'day', 
-                    log: [...currentLog, '️ Ночь закончилась. Город просыпается.'] 
+                    phase: 'day',
+                    dayStartedAt: Date.now(),
+                    votingStarted: false,
+                    log: [...currentLog, '☀️ Ночь закончилась. Город просыпается.'] 
                 });
+            }
+        }
+
+        async function startVotingPhase() {
+            const ref = database.ref(`games/${currentGameId}`);
+            const currentLog = Array.isArray(gameData.log) ? gameData.log : [gameData.log];
+            
+            // Обработка результатов ночи
+            const newLog = [...currentLog];
+            if (gameData.mafiaVote && gameData.doctorVote !== gameData.mafiaVote) {
+                const victim = Object.values(gameData.players).find(p => p.id === gameData.mafiaVote);
+                if (victim) {
+                    await ref.child(`players/${victim.id}/alive`).set(false);
+                    newLog.push(`💀 ${victim.name} был убит ночью`);
+                }
+            } else if (gameData.mafiaVote && gameData.doctorVote === gameData.mafiaVote) {
+                newLog.push('💉 Доктор спас жертву мафии!');
+            }
+            
+            playSound('day');
+            speak('Время голосования');
+            
+            await ref.update({
+                phase: 'voting',
+                votingStarted: true,
+                votes: {},
+                log: newLog
+            });
+            
+            // Сброс голосов
+            for (const playerId in gameData.players) {
+                await ref.child(`players/${playerId}/voted`).set(null);
             }
         }
 
@@ -662,9 +791,75 @@
             } catch (e) { alert('Ошибка: ' + e.message); }
         }
 
+        async function endVoting() {
+            if (gameData.phase !== 'voting') return;
+            
+            const ref = database.ref(`games/${currentGameId}`);
+            let maxVotes = 0;
+            let eliminatedPlayer = null;
+            let tie = false;
+            
+            if (gameData.votes) {
+                for (const [playerId, voteCount] of Object.entries(gameData.votes)) {
+                    if (voteCount > maxVotes) {
+                        maxVotes = voteCount;
+                        eliminatedPlayer = playerId;
+                        tie = false;
+                    } else if (voteCount === maxVotes && voteCount > 0) {
+                        tie = true;
+                    }
+                }
+            }
+            
+            const currentLog = Array.isArray(gameData.log) ? gameData.log : [gameData.log];
+            const newLog = [...currentLog];
+            
+            if (eliminatedPlayer && maxVotes > 0 && !tie) {
+                const player = gameData.players[eliminatedPlayer];
+                await ref.child(`players/${eliminatedPlayer}/alive`).set(false);
+                newLog.push(`🗳️ ${player.name} был исключен (${maxVotes} голосов). Роль: ${player.role}`);
+                speak(`${player.name} был исключен из игры`);
+            } else if (tie) {
+                newLog.push('🗳️ Голоса разделились поровну. Никто не был исключен.');
+                speak('Голоса разделились поровну');
+            } else {
+                newLog.push('Никто не был исключен');
+            }
+            
+            // Проверка условий победы
+            const updatedGame = await ref.once('value');
+            const game = updatedGame.val();
+            const aliveMafia = Object.values(game.players).filter(p => p.role === 'Мафия' && p.alive).length;
+            const aliveCivilians = Object.values(game.players).filter(p => p.role !== 'Мафия' && p.alive).length;
+            
+            if (aliveMafia === 0) {
+                await ref.update({ phase: 'finished', log: [...newLog, '🎉 Мирные жители победили!'] });
+                speak('Мирные жители победили');
+            } else if (aliveMafia >= aliveCivilians) {
+                await ref.update({ phase: 'finished', log: [...newLog, '🔪 Мафия победила!'] });
+                speak('Мафия победила');
+            } else {
+                // Следующая ночь
+                setTimeout(async () => {
+                    playSound('night');
+                    speak('Наступает ночь');
+                    await ref.update({
+                        phase: 'night',
+                        day: game.day + 1,
+                        activeAction: 'mafia',
+                        mafiaVote: null,
+                        doctorVote: null,
+                        detectiveVote: null,
+                        votes: {},
+                        log: [...newLog, `🌙 Ночь ${game.day + 1}`, '🔪 Мафия просыпается']
+                    });
+                }, 5000);
+            }
+        }
+
         function showFinalResults(game) {
             const mafiaCount = Object.values(game.players).filter(p => p.role === 'Мафия' && p.alive).length;
-            document.getElementById('winnerTitle').textContent = mafiaCount === 0 ? 'Мирные жители победили! ' : 'Мафия победила! 🔪';
+            document.getElementById('winnerTitle').textContent = mafiaCount === 0 ? 'Мирные жители победили! 🎉' : 'Мафия победила! 🔪';
             document.getElementById('finalRoles').innerHTML = Object.values(game.players).map(p => `
                 <div class="player-item">
                     <div>
@@ -684,6 +879,8 @@
 
             voiceEnabled = document.getElementById('voiceEnabled').checked;
             soundEnabled = document.getElementById('soundEnabled').checked;
+            
+            initAudio();
 
             try {
                 const ref = database.ref(`games/${currentGameId}`);
@@ -703,7 +900,7 @@
                             phase: 'night',
                             day: 1,
                             activeAction: 'mafia',
-                            log: ['🌙 Наступает ночь. Город засыпает.', '🔪 Мафия просыпается']
+                            log: [' Наступает ночь. Город засыпает.', '🔪 Мафия просыпается']
                         });
                     } catch (e) { console.error(e); }
                 }, 15000);
@@ -717,6 +914,15 @@
             while (roles.length < playerCount) roles.push('Мирный житель');
             return roles.sort(() => Math.random() - 0.5);
         }
+
+        // Закрыть dropdown при клике вне его
+        document.addEventListener('click', (e) => {
+            const settings = document.querySelector('.in-game-settings');
+            const dropdown = document.getElementById('settingsDropdown');
+            if (settings && !settings.contains(e.target)) {
+                dropdown?.classList.remove('show');
+            }
+        });
 
         window.addEventListener('beforeunload', () => {
             if (gameListener && currentGameId) {
