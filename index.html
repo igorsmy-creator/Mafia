@@ -103,6 +103,17 @@
         .role-icon { font-size: 4em; margin-bottom: 20px; }
         .role-name { font-size: 2em; font-weight: bold; margin-bottom: 10px; }
         .role-description { font-size: 1.1em; color: #4ecdc4; }
+        .my-role-badge {
+            text-align: center;
+            background: rgba(255,217,61,0.15);
+            border: 1px solid #ffd93d;
+            color: #ffd93d;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
         .vote-section { background: rgba(255,107,107,0.1); padding: 20px; border-radius: 10px; margin: 20px 0; }
         .vote-button {
             background: rgba(78,205,196,0.2);
@@ -131,6 +142,9 @@
         .action-panel { background: rgba(0,0,0,0.5); padding: 30px; border-radius: 15px; margin: 20px 0; text-align: center; }
         .action-title { font-size: 2em; margin-bottom: 20px; color: #ffd93d; }
         .target-selection { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .detective-result { font-size: 1.8em; padding: 20px; border-radius: 10px; margin: 10px 0; font-weight: bold; }
+        .result-mafia { background: rgba(255,107,107,0.3); color: #ff6b6b; border: 2px solid #ff6b6b; }
+        .result-civilian { background: rgba(78,205,196,0.3); color: #4ecdc4; border: 2px solid #4ecdc4; }
     </style>
 </head>
 <body>
@@ -169,10 +183,11 @@
                 <div class="role-name" id="roleName">Ваша роль</div>
                 <div class="role-description" id="roleDescription">Описание роли</div>
             </div>
-            <div class="waiting-message">Дождитесь начала игры...</div>
+            <div class="waiting-message">Запомните роль. Игра начнется автоматически...</div>
         </div>
 
         <div id="gameScreen" class="screen hidden">
+            <div id="myRoleBadge" class="my-role-badge"></div>
             <div id="phaseIndicator" class="phase-indicator"></div>
             <div id="actionPanel" class="action-panel hidden">
                 <div class="action-title" id="actionTitle">Выберите действие</div>
@@ -198,7 +213,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 
     <script>
-        // ========== FIREBASE CONFIG ==========
         const firebaseConfig = {
             apiKey: "AIzaSyD80aEmTGwNjW7x6YLxqB5QyjfMA8vs2D4",
             authDomain: "mafia-game-7f26e.firebaseapp.com",
@@ -218,57 +232,22 @@
         let myRole = null;
         let gameData = null;
         let gameListener = null;
+        let lastProcessedActionTime = 0;
 
-        const ROLES = {
-            MAFIA: 'Мафия',
-            CIVILIAN: 'Мирный житель',
-            DOCTOR: 'Доктор',
-            DETECTIVE: 'Детектив'
-        };
-
+        const ROLES = { MAFIA: 'Мафия', CIVILIAN: 'Мирный житель', DOCTOR: 'Доктор', DETECTIVE: 'Детектив' };
         const ROLE_ICONS = { 'Мафия': '🔪', 'Мирный житель': '👤', 'Доктор': '💉', 'Детектив': '🔍' };
 
-        // ========== НАВИГАЦИЯ ==========
-        function showMenuScreen() {
-            hideAllScreens();
-            document.getElementById('menuScreen').classList.remove('hidden');
-        }
+        function showMenuScreen() { hideAllScreens(); document.getElementById('menuScreen').classList.remove('hidden'); }
+        function showJoinScreen() { hideAllScreens(); document.getElementById('joinScreen').classList.remove('hidden'); }
+        function showWaitingScreen(gameCode) { hideAllScreens(); document.getElementById('waitingScreen').classList.remove('hidden'); document.getElementById('displayGameCode').textContent = gameCode; }
+        function showRoleScreen() { hideAllScreens(); document.getElementById('roleScreen').classList.remove('hidden'); }
+        function showGameScreen() { hideAllScreens(); document.getElementById('gameScreen').classList.remove('hidden'); }
+        function showWinnerScreen() { hideAllScreens(); document.getElementById('winnerScreen').classList.remove('hidden'); }
+        function hideAllScreens() { document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden')); }
 
-        function showJoinScreen() {
-            hideAllScreens();
-            document.getElementById('joinScreen').classList.remove('hidden');
-        }
-
-        function showWaitingScreen(gameCode) {
-            hideAllScreens();
-            document.getElementById('waitingScreen').classList.remove('hidden');
-            document.getElementById('displayGameCode').textContent = gameCode;
-        }
-
-        function showRoleScreen() {
-            hideAllScreens();
-            document.getElementById('roleScreen').classList.remove('hidden');
-        }
-
-        function showGameScreen() {
-            hideAllScreens();
-            document.getElementById('gameScreen').classList.remove('hidden');
-        }
-
-        function showWinnerScreen() {
-            hideAllScreens();
-            document.getElementById('winnerScreen').classList.remove('hidden');
-        }
-
-        function hideAllScreens() {
-            document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
-        }
-
-        // ========== СОЗДАНИЕ/ВХОД В ИГРУ ==========
         async function createGame() {
             const playerName = document.getElementById('playerNameInput').value.trim();
             if (!playerName) { alert('Введите имя!'); return; }
-
             try {
                 const cred = await auth.signInAnonymously();
                 myPlayerId = cred.user.uid;
@@ -276,16 +255,10 @@
                 currentGameId = gameCode;
 
                 await database.ref(`games/${gameCode}`).set({
-                    code: gameCode,
-                    hostId: myPlayerId,
-                    phase: 'waiting',
-                    day: 1,
-                    players: {
-                        [myPlayerId]: { id: myPlayerId, name: playerName, role: null, alive: true, voted: null, isHost: true }
-                    },
+                    code: gameCode, hostId: myPlayerId, phase: 'waiting', day: 1,
+                    players: { [myPlayerId]: { id: myPlayerId, name: playerName, role: null, alive: true, voted: null, isHost: true } },
                     createdAt: firebase.database.ServerValue.TIMESTAMP
                 });
-
                 showWaitingScreen(gameCode);
                 setupGameListener(gameCode);
             } catch (e) { alert('Ошибка: ' + e.message); }
@@ -295,11 +268,9 @@
             const gameCode = document.getElementById('gameCodeInput').value.trim().toUpperCase();
             const playerName = document.getElementById('joinNameInput').value.trim();
             if (!gameCode || !playerName) { alert('Введите код и имя!'); return; }
-
             try {
                 const cred = await auth.signInAnonymously();
                 myPlayerId = cred.user.uid;
-
                 const snap = await database.ref(`games/${gameCode}`).once('value');
                 const game = snap.val();
                 if (!game) { alert('Игра не найдена!'); return; }
@@ -309,21 +280,19 @@
                 await database.ref(`games/${gameCode}/players/${myPlayerId}`).set({
                     id: myPlayerId, name: playerName, role: null, alive: true, voted: null, isHost: false
                 });
-
                 currentGameId = gameCode;
                 showWaitingScreen(gameCode);
                 setupGameListener(gameCode);
             } catch (e) { alert('Ошибка: ' + e.message); }
         }
 
-        // ========== СЛУШАТЕЛЬ ==========
         function setupGameListener(gameCode) {
             gameListener = database.ref(`games/${gameCode}`).on('value', (snap) => {
                 const game = snap.val();
                 if (!game) return;
                 gameData = game;
                 const myPlayer = game.players[myPlayerId];
-                if (myPlayer) myRole = myPlayer.role;
+                if (myPlayer && myPlayer.role) myRole = myPlayer.role;
                 updateUI(game);
             });
         }
@@ -348,22 +317,21 @@
                 showWinnerScreen();
                 showFinalResults(game);
             }
+
+            // АВТОМАТИЧЕСКОЕ ПРОДВИЖЕНИЕ НОЧИ (только для хоста)
+            if (myPlayerId === game.hostId && game.lastActionAt && game.lastActionAt > lastProcessedActionTime) {
+                lastProcessedActionTime = game.lastActionAt;
+                setTimeout(() => advanceNightPhaseHost(), 2000); // 2 секунды задержка для драматизма
+            }
         }
 
         function updateWaitingList(players) {
-            const list = document.getElementById('waitingPlayerList');
-            list.innerHTML = Object.values(players).map(p => `
+            document.getElementById('waitingPlayerList').innerHTML = Object.values(players).map(p => `
                 <div class="player-item ${p.isHost ? 'host' : ''}">
-                    <div>
-                        <div class="player-name">${p.name}</div>
-                        <div class="player-status">${p.id === myPlayerId ? 'Вы' : ''}</div>
-                    </div>
+                    <div><div class="player-name">${p.name}</div><div class="player-status">${p.id === myPlayerId ? 'Вы' : ''}</div></div>
                 </div>
             `).join('');
-
-            if (myPlayerId === gameData.hostId) {
-                document.getElementById('hostControls').classList.remove('hidden');
-            }
+            if (myPlayerId === gameData.hostId) document.getElementById('hostControls').classList.remove('hidden');
         }
 
         function getRoleDesc(role) {
@@ -376,6 +344,9 @@
         }
 
         function updateGameScreen(game) {
+            // Бейдж с ролью игрока
+            document.getElementById('myRoleBadge').innerHTML = `Ваша роль: ${ROLE_ICONS[myRole] || '🎭'} ${myRole || 'Неизвестно'}`;
+
             const phaseEl = document.getElementById('phaseIndicator');
             if (game.phase === 'night') {
                 phaseEl.className = 'phase-indicator phase-night';
@@ -388,16 +359,7 @@
                 phaseEl.textContent = `🗳️ Голосование - День ${game.day}`;
             }
 
-            // Список игроков
-            document.getElementById('playersList').innerHTML = Object.values(game.players).map(p => `
-                <div class="player-item ${!p.alive ? 'dead' : ''}">
-                    <div>
-                        <div class="player-name">${p.name}</div>
-                        <div class="player-role">${p.role || '?'}</div>
-                    </div>
-                    <div class="player-status">${p.alive ? '✅ Жив' : '💀 Мертв'}</div>
-                </div>
-            `).join('');
+            renderPlayerList(game);
 
             // Ночные действия
             if (game.phase === 'night' && game.activeAction) {
@@ -416,9 +378,46 @@
             // Лог
             if (game.log) {
                 const logEl = document.getElementById('gameLog');
-                logEl.innerHTML = game.log.map(e => `<div class="log-entry">${e}</div>`).join('');
+                const logArray = Array.isArray(game.log) ? game.log : [game.log];
+                logEl.innerHTML = logArray.map(e => `<div class="log-entry">${e}</div>`).join('');
                 logEl.scrollTop = logEl.scrollHeight;
             }
+        }
+
+        function renderPlayerList(game) {
+            const listEl = document.getElementById('playersList');
+            const isNight = game.phase === 'night';
+            const isFinished = game.phase === 'finished';
+
+            let html = '';
+            Object.values(game.players).forEach(p => {
+                if (isNight) {
+                    // НОЧЬЮ: скрываем роли и статусы жизни/смерти!
+                    html += `
+                        <div class="player-item">
+                            <div class="player-name">${p.name}</div>
+                            <div class="player-role" style="color: #888; font-style: italic;">🌙 Спит</div>
+                        </div>
+                    `;
+                } else {
+                    // ДНЕМ: показываем статус. Роль видна только мертвым, себе или в конце игры.
+                    const isMe = p.id === myPlayerId;
+                    let roleDisplay = '?';
+                    if (isFinished || !p.alive || isMe) {
+                        roleDisplay = p.role || '?';
+                    }
+                    html += `
+                        <div class="player-item ${!p.alive ? 'dead' : ''}">
+                            <div>
+                                <div class="player-name">${p.name} ${isMe ? '(Вы)' : ''}</div>
+                                <div class="player-role">${ROLE_ICONS[roleDisplay] || ''} ${roleDisplay}</div>
+                            </div>
+                            <div class="player-status">${p.alive ? '✅ Жив' : '💀 Мертв'}</div>
+                        </div>
+                    `;
+                }
+            });
+            listEl.innerHTML = html;
         }
 
         function handleNightAction(action, myPlayer) {
@@ -426,16 +425,30 @@
             const sel = document.getElementById('targetSelection');
             const title = document.getElementById('actionTitle');
 
+            // Используем глобальную myRole для надежности
+            const currentRole = myRole || myPlayer.role;
             let targets = [];
-            if (action === 'mafia' && myPlayer.role === ROLES.MAFIA) {
+
+            if (action === 'mafia' && currentRole === 'Мафия') {
                 title.textContent = '🔪 Мафия, выберите жертву';
-                targets = Object.values(gameData.players).filter(p => p.alive && p.role !== ROLES.MAFIA);
-            } else if (action === 'doctor' && myPlayer.role === ROLES.DOCTOR) {
+                targets = Object.values(gameData.players).filter(p => p.alive && p.role !== 'Мафия');
+            } else if (action === 'doctor' && currentRole === 'Доктор') {
                 title.textContent = '💉 Доктор, выберите кого спасти';
                 targets = Object.values(gameData.players).filter(p => p.alive);
-            } else if (action === 'detective' && myPlayer.role === ROLES.DETECTIVE) {
+            } else if (action === 'detective' && currentRole === 'Детектив') {
+                // Если детектив уже проголосовал, показываем ему результат
+                if (gameData.detectiveVote) {
+                    const target = Object.values(gameData.players).find(p => p.id === gameData.detectiveVote);
+                    const isMafia = target.role === 'Мафия';
+                    panel.classList.remove('hidden');
+                    title.textContent = '🔍 Результат проверки';
+                    sel.innerHTML = `<div class="detective-result ${isMafia ? 'result-mafia' : 'result-civilian'}">
+                        ${target.name}: ${isMafia ? '🔪 МАФИЯ!' : '✅ Мирный житель'}
+                    </div>`;
+                    return;
+                }
                 title.textContent = '🔍 Детектив, выберите кого проверить';
-                targets = Object.values(gameData.players).filter(p => p.alive && p.role !== ROLES.DETECTIVE);
+                targets = Object.values(gameData.players).filter(p => p.alive && p.role !== 'Детектив');
             } else {
                 panel.classList.add('hidden');
                 return;
@@ -450,11 +463,58 @@
         async function performNightAction(targetId) {
             try {
                 const ref = database.ref(`games/${currentGameId}`);
-                if (myRole === ROLES.MAFIA) await ref.child('mafiaVote').set(targetId);
-                else if (myRole === ROLES.DOCTOR) await ref.child('doctorVote').set(targetId);
-                else if (myRole === ROLES.DETECTIVE) await ref.child('detectiveVote').set(targetId);
+                const actionKey = myRole === 'Мафия' ? 'mafiaVote' : (myRole === 'Доктор' ? 'doctorVote' : 'detectiveVote');
+                
+                await ref.update({
+                    [actionKey]: targetId,
+                    lastActionAt: firebase.database.ServerValue.TIMESTAMP // Сигнал хосту продвинуть игру
+                });
+                
                 document.getElementById('actionPanel').classList.add('hidden');
             } catch (e) { alert('Ошибка: ' + e.message); }
+        }
+
+        // ЛОГИКА ХОСТА ДЛЯ ПРОДВИЖЕНИЯ НОЧИ
+        async function advanceNightPhaseHost() {
+            const ref = database.ref(`games/${currentGameId}`);
+            const currentAction = gameData.activeAction;
+            
+            // Получаем самые свежие данные
+            const snap = await ref.once('value');
+            const latestGame = snap.val();
+            const currentLog = Array.isArray(latestGame.log) ? latestGame.log : (latestGame.log ? [latestGame.log] : []);
+
+            if (currentAction === 'mafia') {
+                const hasDoctor = Object.values(latestGame.players).some(p => p.role === 'Доктор' && p.alive);
+                if (hasDoctor) {
+                    await ref.update({ activeAction: 'doctor', log: [...currentLog, '💉 Доктор просыпается'] });
+                } else {
+                    await advanceToDetectiveOrDay(ref, latestGame);
+                }
+            } else if (currentAction === 'doctor') {
+                await advanceToDetectiveOrDay(ref, latestGame);
+            } else if (currentAction === 'detective') {
+                await ref.update({ 
+                    activeAction: null, 
+                    phase: 'day', 
+                    log: [...currentLog, '☀️ Ночь закончилась. Город просыпается.'] 
+                });
+            }
+        }
+
+        async function advanceToDetectiveOrDay(ref, latestGame) {
+            const currentLog = Array.isArray(latestGame.log) ? latestGame.log : (latestGame.log ? [latestGame.log] : []);
+            const hasDetective = Object.values(latestGame.players).some(p => p.role === 'Детектив' && p.alive);
+            
+            if (hasDetective) {
+                await ref.update({ activeAction: 'detective', log: [...currentLog, '🔍 Детектив просыпается'] });
+            } else {
+                await ref.update({ 
+                    activeAction: null, 
+                    phase: 'day', 
+                    log: [...currentLog, '☀️ Ночь закончилась. Город просыпается.'] 
+                });
+            }
         }
 
         function showVotingSection(game) {
@@ -464,7 +524,7 @@
             section.classList.remove('hidden');
 
             if (myPlayer.voted) {
-                buttons.innerHTML = '<div class="waiting-message">✅ Вы уже проголосовали</div>';
+                buttons.innerHTML = '<div class="waiting-message">✅ Вы уже проголосовали. Ожидание остальных...</div>';
                 return;
             }
             if (!myPlayer.alive) {
@@ -491,7 +551,7 @@
         }
 
         function showFinalResults(game) {
-            const mafiaCount = Object.values(game.players).filter(p => p.role === ROLES.MAFIA && p.alive).length;
+            const mafiaCount = Object.values(game.players).filter(p => p.role === 'Мафия' && p.alive).length;
             document.getElementById('winnerTitle').textContent = mafiaCount === 0 ? 'Мирные жители победили! 🎉' : 'Мафия победила! 🔪';
             document.getElementById('finalRoles').innerHTML = Object.values(game.players).map(p => `
                 <div class="player-item">
@@ -504,7 +564,6 @@
             `).join('');
         }
 
-        // ========== СТАРТ ИГРЫ (ХОСТ) ==========
         async function startGame() {
             if (!gameData) { alert('Данные игры не загружены!'); return; }
             if (myPlayerId !== gameData.hostId) { alert('Только хост может начать!'); return; }
@@ -516,10 +575,7 @@
                 const roles = distributeRoles(playerCount);
                 const players = Object.keys(gameData.players);
 
-                // Меняем фазу
                 await ref.child('phase').set('role_reveal');
-
-                // Раздаем роли каждому игроку ОТДЕЛЬНО
                 for (let i = 0; i < players.length; i++) {
                     await ref.child(`players/${players[i]}/role`).set(roles[i]);
                 }
@@ -527,10 +583,12 @@
                 // Через 15 секунд — первая ночь
                 setTimeout(async () => {
                     try {
-                        await ref.child('phase').set('night');
-                        await ref.child('day').set(1);
-                        await ref.child('activeAction').set('mafia');
-                        await ref.child('log').set(['=== Ночь 1 ===', 'Мафия просыпается']);
+                        await ref.update({
+                            phase: 'night',
+                            day: 1,
+                            activeAction: 'mafia',
+                            log: ['🌙 Наступает ночь. Город засыпает.', '🔪 Мафия просыпается']
+                        });
                     } catch (e) { console.error(e); }
                 }, 15000);
             } catch (e) { alert('Ошибка: ' + e.message); }
@@ -538,9 +596,9 @@
 
         function distributeRoles(playerCount) {
             const mafiaCount = Math.max(1, Math.floor(playerCount / 3));
-            const roles = [ROLES.DOCTOR, ROLES.DETECTIVE];
-            for (let i = 0; i < mafiaCount; i++) roles.push(ROLES.MAFIA);
-            while (roles.length < playerCount) roles.push(ROLES.CIVILIAN);
+            const roles = ['Доктор', 'Детектив'];
+            for (let i = 0; i < mafiaCount; i++) roles.push('Мафия');
+            while (roles.length < playerCount) roles.push('Мирный житель');
             return roles.sort(() => Math.random() - 0.5);
         }
 
