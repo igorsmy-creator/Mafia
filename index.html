@@ -173,7 +173,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎭 МАФИЯ ОНЛАЙН </h1>
+        <h1>🎭 МАФИЯ ОНЛАЙН 🎭</h1>
         
         <div id="menuScreen" class="screen">
             <h2 style="text-align: center; margin-bottom: 20px;">Добро пожаловать!</h2>
@@ -223,7 +223,7 @@
 
         <div id="gameScreen" class="screen hidden">
             <div class="in-game-settings">
-                <button class="btn-small" onclick="toggleSettings()">️ Настройки</button>
+                <button class="btn-small" onclick="toggleSettings()">⚙️ Настройки</button>
                 <div id="settingsDropdown" class="settings-dropdown">
                     <h3 style="color: #ffd93d; margin-bottom: 10px;">🔊 Звук</h3>
                     <label class="checkbox-label">
@@ -293,7 +293,7 @@
         let detectiveResultTimer = null;
 
         const ROLES = { MAFIA: 'Мафия', CIVILIAN: 'Мирный житель', DOCTOR: 'Доктор', DETECTIVE: 'Детектив' };
-        const ROLE_ICONS = { 'Мафия': '', 'Мирный житель': '👤', 'Доктор': '💉', 'Детектив': '🔍' };
+        const ROLE_ICONS = { 'Мафия': '', 'Мирный житель': '', 'Доктор': '💉', 'Детектив': '🔍' };
 
         function initAudio() {
             if (audioInitialized) return;
@@ -477,12 +477,14 @@
             }
 
             // АВТОМАТИЧЕСКОЕ ПРОДВИЖЕНИЕ НОЧИ (только для хоста)
-            // ИСПРАВЛЕНИЕ: Не продвигаем если детектив еще не увидел результат
+            // ИСПРАВЛЕНИЕ: используем detectiveActionDone + !detectiveResultSeen
             const currentPhaseKey = `${game.phase}-${game.activeAction || 'none'}`;
-            const detectiveJustVoted = game.activeAction === 'detective' && game.detectiveVote && !game.detectiveResultSeen;
+            const detectiveStillViewing = game.activeAction === 'detective' && 
+                                          game.detectiveActionDone && 
+                                          !game.detectiveResultSeen;
             
             if (myPlayerId === game.hostId && game.lastActionAt && game.lastActionAt > lastProcessedActionTime && 
-                currentPhaseKey !== lastProcessedPhase && !detectiveJustVoted) {
+                currentPhaseKey !== lastProcessedPhase && !detectiveStillViewing) {
                 lastProcessedActionTime = game.lastActionAt;
                 lastProcessedPhase = currentPhaseKey;
                 setTimeout(() => advanceNightPhaseHost(), 3000);
@@ -579,7 +581,7 @@
                                 <div class="player-name">${p.name} ${isMe ? '(Вы)' : ''}</div>
                                 <div class="player-role">${ROLE_ICONS[roleDisplay] || ''} ${roleDisplay}</div>
                             </div>
-                            <div class="player-status">${p.alive ? '✅ Жив' : '💀 Мертв'}</div>
+                            <div class="player-status">${p.alive ? '✅ Жив' : ' Мертв'}</div>
                         </div>
                     `;
                 }
@@ -602,8 +604,12 @@
                 title.textContent = '💉 Доктор, выберите кого спасти';
                 targets = Object.values(gameData.players).filter(p => p.alive);
             } else if (action === 'detective' && currentRole === 'Детектив') {
-                // ИСПРАВЛЕНИЕ: Проверяем detectiveResultSeen вместо detectiveResultShown
-                if (gameData.detectiveVote && !gameData.detectiveResultSeen) {
+                // ИСПРАВЛЕНИЕ: используем detectiveActionDone и detectiveResultSeen
+                const detectiveActionDone = gameData.detectiveActionDone;
+                const detectiveResultSeen = gameData.detectiveResultSeen;
+                
+                if (detectiveActionDone && !detectiveResultSeen) {
+                    // Показываем результат проверки
                     const target = Object.values(gameData.players).find(p => p.id === gameData.detectiveVote);
                     if (target) {
                         const isMafia = target.role === 'Мафия';
@@ -613,23 +619,19 @@
                             ${target.name}: ${isMafia ? '🔪 МАФИЯ!' : '✅ Мирный житель'}
                         </div>
                         <div class="waiting-message">Запомните результат...</div>`;
-                        
-                        // Устанавливаем флаг что результат показан
-                        const ref = database.ref(`games/${currentGameId}`);
-                        ref.update({ detectiveResultSeen: true });
-                        
-                        // Через 5 секунд продвигаем игру
-                        if (detectiveResultTimer) clearTimeout(detectiveResultTimer);
-                        detectiveResultTimer = setTimeout(async () => {
-                            panel.classList.add('hidden');
-                            // Обновляем lastActionAt чтобы триггер сработал
-                            await ref.update({ lastActionAt: firebase.database.ServerValue.TIMESTAMP });
-                        }, 5000);
-                        return;
                     }
+                    return; // ВАЖНО: выходим, не показываем список выбора
                 }
                 
-                title.textContent = '🔍 Детектив, выберите кого проверить';
+                if (detectiveActionDone && detectiveResultSeen) {
+                    // Результат уже был показан, ждем перехода к дню
+                    // Скрываем панель, не показываем список снова
+                    panel.classList.add('hidden');
+                    return;
+                }
+                
+                // Детектив еще не делал выбор - показываем список
+                title.textContent = ' Детектив, выберите кого проверить';
                 targets = Object.values(gameData.players).filter(p => p.alive && p.role !== 'Детектив');
             } else {
                 panel.classList.add('hidden');
@@ -655,8 +657,9 @@
                     lastActionAt: firebase.database.ServerValue.TIMESTAMP
                 };
                 
-                // Для детектива сбрасываем флаг результата
+                // ИСПРАВЛЕНИЕ: для детектива устанавливаем detectiveActionDone
                 if (myRole === 'Детектив') {
+                    updates.detectiveActionDone = true;
                     updates.detectiveResultSeen = false;
                 }
                 
@@ -757,7 +760,6 @@
             const myPlayer = game.players[myPlayerId];
             section.classList.remove('hidden');
 
-            // Показываем кнопку завершения только хосту
             const endBtn = document.getElementById('endVotingBtn');
             if (myPlayerId === game.hostId) {
                 endBtn.classList.remove('hidden');
@@ -766,7 +768,7 @@
             }
 
             if (!myPlayer.alive) {
-                buttons.innerHTML = '<div class="waiting-message"> Вы не можете голосовать</div>';
+                buttons.innerHTML = '<div class="waiting-message">💀 Вы не можете голосовать</div>';
                 return;
             }
 
@@ -787,12 +789,10 @@
                 const ref = database.ref(`games/${currentGameId}`);
                 const myPlayer = gameData.players[myPlayerId];
                 
-                // Если уже голосовал за другого, уменьшаем счетчик
                 if (myPlayer.voted && myPlayer.voted !== targetId) {
                     await ref.child(`votes/${myPlayer.voted}`).transaction(c => Math.max(0, (c || 1) - 1));
                 }
                 
-                // Устанавливаем новый голос
                 await ref.child(`players/${myPlayerId}/voted`).set(targetId);
                 await ref.child(`votes/${targetId}`).transaction(c => (c || 0) + 1);
                 
@@ -801,7 +801,6 @@
         }
 
         async function endVoting() {
-            // ИСПРАВЛЕНИЕ: Только хост может завершить голосование
             if (gameData.phase !== 'voting') return;
             if (myPlayerId !== gameData.hostId) {
                 alert('Только хост может завершить голосование!');
@@ -862,10 +861,11 @@
                         mafiaVote: null,
                         doctorVote: null,
                         detectiveVote: null,
+                        detectiveActionDone: false,
                         detectiveResultSeen: false,
                         votes: {},
                         lastActionAt: 0,
-                        log: [...newLog, `🌙 Ночь ${game.day + 1}`, '🔪 Мафия просыпается']
+                        log: [...newLog, ` Ночь ${game.day + 1}`, ' Мафия просыпается']
                     });
                 }, 5000);
             }
@@ -914,6 +914,7 @@
                             day: 1,
                             activeAction: 'mafia',
                             lastActionAt: 0,
+                            detectiveActionDone: false,
                             detectiveResultSeen: false,
                             log: ['🌙 Наступает ночь. Город засыпает.', '🔪 Мафия просыпается']
                         });
@@ -945,6 +946,8 @@
             if (gameListener && currentGameId) {
                 database.ref(`games/${currentGameId}`).off('value', gameListener);
             }
+            if (detectiveResultTimer) clearTimeout(detectiveResultTimer);
+            if (votingTimer) clearTimeout(votingTimer);
         });
     </script>
 </body>
