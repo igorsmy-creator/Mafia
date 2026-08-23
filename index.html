@@ -42,13 +42,7 @@
             margin-bottom: 15px;
         }
         input[type="range"] { width: 100%; margin: 10px 0; }
-        .checkbox-label {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-            margin: 10px 0;
-        }
+        .checkbox-label { display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 10px 0; }
         .checkbox-label input { width: auto; margin: 0; }
         button {
             background: linear-gradient(45deg, #ff6b6b, #ee5a6f);
@@ -267,9 +261,9 @@
                     </label>
                     <label class="checkbox-label">
                         <input type="checkbox" id="soundEnabled" checked>
-                        <span> Звуковые эффекты</span>
+                        <span>🔔 Звуковые эффекты</span>
                     </label>
-                    <label>️ Голос:</label>
+                    <label>🗣️ Голос:</label>
                     <select id="voiceSelect"><option value="">Загрузка голосов...</option></select>
                     <label>Скорость речи: <span id="rateValue">0.9</span></label>
                     <input type="range" id="rateSlider" min="0.5" max="1.5" step="0.1" value="0.9">
@@ -279,8 +273,8 @@
             </div>
             
             <input type="text" id="playerNameInput" placeholder="Введите ваше имя">
-            <button onclick="createGame()"> Создать игру</button>
-            <button class="btn-secondary" onclick="showJoinScreen()"> Присоединиться к игре</button>
+            <button onclick="createGame()">🎮 Создать игру</button>
+            <button class="btn-secondary" onclick="showJoinScreen()">🔗 Присоединиться к игре</button>
         </div>
 
         <div id="joinScreen" class="screen hidden">
@@ -297,7 +291,7 @@
             <p style="text-align: center; margin: 20px 0;">Поделитесь этим кодом с друзьями</p>
             <div id="waitingPlayerList"></div>
             <div id="hostControls" class="hidden">
-                <button id="startGameBtn" onclick="startGame()">🎲 Начать игру</button>
+                <button id="startGameBtn" onclick="startGame()"> Начать игру</button>
             </div>
             <div class="waiting-message">Ожидание других игроков...</div>
         </div>
@@ -324,7 +318,7 @@
                         <input type="checkbox" id="gameSoundEnabled" checked onchange="updateSoundSettings()">
                         <span>Звуковые эффекты</span>
                     </label>
-                    <label>️ Голос:</label>
+                    <label>🗣️ Голос:</label>
                     <select id="gameVoiceSelect" onchange="updateVoiceSettings()"><option value="">Загрузка...</option></select>
                     <label>Скорость: <span id="gameRateValue">0.9</span></label>
                     <input type="range" id="gameRateSlider" min="0.5" max="1.5" step="0.1" value="0.9" oninput="updateVoiceSettings()">
@@ -380,7 +374,6 @@
         let myRole = null;
         let gameData = null;
         let gameListener = null;
-        let lastProcessedActionTime = 0;
         let voiceEnabled = true;
         let soundEnabled = true;
         let audioContext = null;
@@ -392,9 +385,12 @@
         let selectedVoice = null;
         let speechRate = 0.9;
         let speechPitch = 1;
+        
+        // ИСПРАВЛЕНИЕ: Флаг предотвращает повторное планирование перехода
+        let advanceScheduled = false;
 
         const ROLES = { MAFIA: 'Мафия', CIVILIAN: 'Мирный житель', DOCTOR: 'Доктор', DETECTIVE: 'Детектив' };
-        const ROLE_ICONS = { 'Мафия': '🔪', 'Мирный житель': '👤', 'Доктор': '', 'Детектив': '🔍' };
+        const ROLE_ICONS = { 'Мафия': '🔪', 'Мирный житель': '👤', 'Доктор': '💉', 'Детектив': '🔍' };
 
         function toggleMainSettings() {
             document.getElementById('mainSettingsContent').classList.toggle('show');
@@ -598,7 +594,7 @@
             });
         }
 
-        // ИСПРАВЛЕНИЕ: Теперь проверяем флаг actionCompleted вместо lastActionAt
+        // ИСПРАВЛЕНИЕ: Полностью переписанная логика переходов
         function updateUI(game) {
             const mp = game.players[myPlayerId];
             if (!mp) return;
@@ -607,7 +603,7 @@
             else if (game.phase === 'role_reveal') {
                 if (mp.role) {
                     showRoleScreen();
-                    document.getElementById('roleIcon').textContent = ROLE_ICONS[mp.role] || '🎭';
+                    document.getElementById('roleIcon').textContent = ROLE_ICONS[mp.role] || '';
                     document.getElementById('roleName').textContent = mp.role;
                     document.getElementById('roleDescription').textContent = getRoleDesc(mp.role);
                 }
@@ -619,8 +615,8 @@
                 showFinalResults(game);
             }
 
-            // ИСПРАВЛЕНИЕ: Проверяем флаг actionCompleted текущего действия
-            // actionCompleted устанавливается в true только когда игрок РЕАЛЬНО делает выбор
+            // ИСПРАВЛЕНИЕ: Новая логика переходов
+            // Проверяем флаг actionCompleted текущего действия
             const currentAction = game.activeAction;
             const actionCompleted = currentAction ? game[`${currentAction}Acted`] : false;
             
@@ -628,14 +624,15 @@
                                           game.detectiveActionDone && 
                                           !game.detectiveResultSeen;
             
-            // Переход к следующей фазе только если:
+            // Планируем переход ТОЛЬКО если:
             // 1. Игрок реально сделал выбор (actionCompleted = true)
-            // 2. lastActionAt обновился
-            // 3. Детектив не смотрит результат
-            if (myPlayerId === game.hostId && actionCompleted && game.lastActionAt && 
-                game.lastActionAt > lastProcessedActionTime && !detectiveStillViewing) {
-                lastProcessedActionTime = game.lastActionAt;
-                setTimeout(() => advanceNightPhaseHost(), 2000);
+            // 2. Детектив не смотрит результат
+            // 3. Переход ещё не запланирован (advanceScheduled = false)
+            if (myPlayerId === game.hostId && actionCompleted && !detectiveStillViewing && !advanceScheduled) {
+                advanceScheduled = true;
+                const expectedAction = currentAction;
+                console.log(`[HOST] Планирую переход от ${expectedAction}, actionCompleted=true`);
+                setTimeout(() => advanceNightPhaseHost(expectedAction), 2000);
             }
             
             if (myPlayerId === game.hostId && game.phase === 'day' && game.dayStartedAt && !votingTimer) {
@@ -663,7 +660,7 @@
         }
 
         function updateGameScreen(game) {
-            document.getElementById('myRoleBadge').innerHTML = `Ваша роль: ${ROLE_ICONS[myRole] || '🎭'} ${myRole || 'Неизвестно'}`;
+            document.getElementById('myRoleBadge').innerHTML = `Ваша роль: ${ROLE_ICONS[myRole] || ''} ${myRole || 'Неизвестно'}`;
             const pe = document.getElementById('phaseIndicator');
             if (game.phase === 'night') { pe.className = 'phase-indicator phase-night'; pe.textContent = `🌙 Ночь ${game.day}`; }
             else if (game.phase === 'day') { pe.className = 'phase-indicator phase-day'; pe.textContent = `☀️ День ${game.day}`; }
@@ -716,7 +713,7 @@
             let targets = [];
 
             if (action === 'mafia' && cr === 'Мафия') {
-                title.textContent = ' Мафия, выберите жертву';
+                title.textContent = '🔪 Мафия, выберите жертву';
                 targets = Object.values(gameData.players).filter(p => p.alive && p.role !== 'Мафия');
                 startRoleTimeout('mafia', 30000);
             } else if (action === 'doctor' && cr === 'Доктор') {
@@ -740,7 +737,7 @@
                             title.textContent = '🔍 Результат проверки';
                             sel.innerHTML = `
                                 <div class="detective-result ${isMafia ? 'result-mafia' : 'result-civilian'}">
-                                    ${target.name}: ${isMafia ? '🔪 МАФИЯ!' : '✅ Мирный житель'}
+                                    ${target.name}: ${isMafia ? ' МАФИЯ!' : '✅ Мирный житель'}
                                 </div>
                                 <div class="waiting-message" id="detectiveTimerText">Запомните результат...</div>
                                 <div class="detective-timer-bar"><div class="detective-timer-fill" id="detectiveTimerFill" style="width:100%"></div></div>
@@ -757,9 +754,10 @@
                                 if (remaining <= 0) {
                                     clearInterval(detectiveLocalTimer);
                                     detectiveLocalTimer = null;
+                                    // ИСПРАВЛЕНИЕ: Устанавливаем detectiveActed = true
                                     database.ref(`games/${currentGameId}`).update({ 
                                         detectiveResultSeen: true,
-                                        lastActionAt: firebase.database.ServerValue.TIMESTAMP 
+                                        detectiveActed: true
                                     });
                                 }
                             }, 100);
@@ -793,10 +791,9 @@
             roleTimeoutTimer = setTimeout(async () => {
                 const ref = database.ref(`games/${currentGameId}`);
                 if (gameData.activeAction === role) {
-                    // ИСПРАВЛЕНИЕ: При таймауте тоже устанавливаем флаг actionCompleted
+                    console.log(`[TIMEOUT] ${role} не сделал выбор, пропускаем`);
                     await ref.update({ 
                         [`${role}Acted`]: true,
-                        lastActionAt: firebase.database.ServerValue.TIMESTAMP,
                         [`${role}Vote`]: null
                     });
                 }
@@ -812,60 +809,68 @@
                 playSound('action');
                 
                 const updates = {
-                    [ak]: targetId,
-                    lastActionAt: firebase.database.ServerValue.TIMESTAMP
+                    [ak]: targetId
                 };
                 
                 // ИСПРАВЛЕНИЕ: Устанавливаем флаг что действие совершено
-                // Это триггерит переход к следующей фазе
                 if (myRole === 'Мафия') updates.mafiaActed = true;
                 else if (myRole === 'Доктор') updates.doctorActed = true;
                 else if (myRole === 'Детектив') {
                     updates.detectiveActionDone = true;
                     updates.detectiveResultSeen = false;
-                    // detectiveActed устанавливается после просмотра результата
+                    // detectiveActed установится после просмотра результата
                 }
                 
                 await ref.update(updates);
+                console.log(`[ACTION] ${myRole} выбрал ${targetId}`);
                 
                 if (roleTimeoutTimer) { clearTimeout(roleTimeoutTimer); roleTimeoutTimer = null; }
             } catch (e) { alert('Ошибка: ' + e.message); }
         }
 
-        // ИСПРАВЛЕНИЕ: При переходе к следующей фазе сбрасываем флаг actionCompleted
-        async function advanceNightPhaseHost() {
+        // ИСПРАВЛЕНИЕ: Принимает expectedAction и проверяет его
+        async function advanceNightPhaseHost(expectedAction) {
+            advanceScheduled = false;
             const ref = database.ref(`games/${currentGameId}`);
             const snap = await ref.once('value');
             const g = snap.val();
-            const ca = g.activeAction;
+            
+            // ИСПРАВЛЕНИЕ: Проверяем что действие всё ещё то которое мы ожидаем
+            if (g.activeAction !== expectedAction) {
+                console.log(`[HOST] Ожидал ${expectedAction}, но сейчас ${g.activeAction}. Отмена перехода.`);
+                return;
+            }
+            
+            console.log(`[HOST] Выполняю переход от ${expectedAction}`);
+            
             const cl = Array.isArray(g.log) ? g.log : (g.log ? [g.log] : []);
 
-            if (ca === 'mafia') {
+            if (expectedAction === 'mafia') {
                 const hasDoc = Object.values(g.players).some(p => p.role === 'Доктор');
                 if (hasDoc) {
                     playSound('wake');
                     speak('Просыпается доктор');
                     await ref.update({ 
                         activeAction: 'doctor',
-                        doctorActed: false,  // Сбрасываем флаг - доктор ещё не действовал
-                        lastActionAt: firebase.database.ServerValue.TIMESTAMP,
+                        doctorActed: false,  // Сбрасываем - доктор ещё не действовал
                         log: [...cl, '💉 Доктор просыпается'] 
                     });
+                    console.log('[HOST] Перешёл к доктору');
                 } else {
                     await advanceToDetectiveOrDay(ref, g);
                 }
-            } else if (ca === 'doctor') {
+            } else if (expectedAction === 'doctor') {
                 await advanceToDetectiveOrDay(ref, g);
-            } else if (ca === 'detective') {
+            } else if (expectedAction === 'detective') {
                 playSound('day');
                 speak('Ночь закончилась. Наступает день');
                 await ref.update({ 
                     activeAction: null, 
                     phase: 'day',
                     dayStartedAt: Date.now(),
-                    lastActionAt: firebase.database.ServerValue.TIMESTAMP,
                     log: [...cl, '☀️ Ночь закончилась. Город просыпается.'] 
                 });
+                console.log('[HOST] Перешёл ко дню');
             }
         }
 
@@ -880,10 +885,10 @@
                     activeAction: 'detective',
                     detectiveActionDone: false,
                     detectiveResultSeen: false,
-                    detectiveActed: false,  // Сбрасываем флаг
-                    lastActionAt: firebase.database.ServerValue.TIMESTAMP,
-                    log: [...cl, '🔍 Детектив просыпается'] 
+                    detectiveActed: false,  // Сбрасываем
+                    log: [...cl, ' Детектив просыпается'] 
                 });
+                console.log('[HOST] Перешёл к детективу');
             } else {
                 playSound('day');
                 speak('Ночь закончилась. Наступает день');
@@ -891,9 +896,9 @@
                     activeAction: null, 
                     phase: 'day',
                     dayStartedAt: Date.now(),
-                    lastActionAt: firebase.database.ServerValue.TIMESTAMP,
                     log: [...cl, '☀️ Ночь закончилась. Город просыпается.'] 
                 });
+                console.log('[HOST] Перешёл ко дню (нет детектива)');
             }
         }
 
@@ -1034,9 +1039,10 @@
                         mafiaVote: null, doctorVote: null, detectiveVote: null,
                         detectiveActionDone: false, detectiveResultSeen: false,
                         mafiaActed: false, doctorActed: false, detectiveActed: false,
-                        votes: {}, lastActionAt: 0,
+                        votes: {},
                         log: [...nl, `🌙 Ночь ${ug.day + 1}`, '🔪 Мафия просыпается']
                     });
+                    console.log('[HOST] Начата новая ночь');
                 }, 5000);
             }
         }
@@ -1062,6 +1068,7 @@
             voiceEnabled = document.getElementById('voiceEnabled').checked;
             soundEnabled = document.getElementById('soundEnabled').checked;
             initAudio();
+            advanceScheduled = false;
             try {
                 const ref = database.ref(`games/${currentGameId}`);
                 const roles = distributeRoles(pc);
@@ -1074,12 +1081,12 @@
                         speak('Наступает ночь. Город засыпает');
                         await ref.update({
                             phase: 'night', day: 1, activeAction: 'mafia',
-                            lastActionAt: 0,
                             mafiaActed: false, doctorActed: false, detectiveActed: false,
                             detectiveActionDone: false, detectiveResultSeen: false,
-                            log: ['🌙 Наступает ночь. Город засыпает.', '🔪 Мафия просыпается']
+                            log: ['🌙 Наступает ночь. Город засыпает.', ' Мафия просыпается']
                         });
                         setTimeout(() => speak('Просыпается мафия'), 1000);
+                        console.log('[HOST] Игра началась, ночь 1');
                     } catch (e) { console.error(e); }
                 }, 15000);
             } catch (e) { alert('Ошибка: ' + e.message); }
