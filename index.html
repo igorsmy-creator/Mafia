@@ -137,6 +137,7 @@
         }
         .vote-button:hover:not(:disabled) { background: rgba(78,205,196,0.4); }
         .vote-button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .vote-button.voted { background: rgba(255,217,61,0.3); border-color: #ffd93d; }
         .vote-count { display: inline-block; background: #ff6b6b; padding: 5px 10px; border-radius: 5px; margin-left: 10px; }
         .log {
             background: rgba(0,0,0,0.5);
@@ -199,12 +200,12 @@
 </head>
 <body>
     <div class="container">
-        <h1> МАФИЯ ОНЛАЙН </h1>
+        <h1>🎭 МАФИЯ ОНЛАЙН 🎭</h1>
         
         <div id="menuScreen" class="screen">
             <h2 style="text-align: center; margin-bottom: 20px;">Добро пожаловать!</h2>
             <div class="settings-panel">
-                <h3>⚙️ Настройки</h3>
+                <h3>️ Настройки</h3>
                 <label class="checkbox-label">
                     <input type="checkbox" id="voiceEnabled" checked>
                     <span>🔊 Голосовое сопровождение</span>
@@ -233,7 +234,7 @@
             <p style="text-align: center; margin: 20px 0;">Поделитесь этим кодом с друзьями</p>
             <div id="waitingPlayerList"></div>
             <div id="hostControls" class="hidden">
-                <button id="startGameBtn" onclick="startGame()">🎲 Начать игру</button>
+                <button id="startGameBtn" onclick="startGame()"> Начать игру</button>
             </div>
             <div class="waiting-message">Ожидание других игроков...</div>
         </div>
@@ -319,10 +320,11 @@
         let detectiveResultTimer = null;
         let detectiveResultStartTime = 0;
         let roleTimeoutTimer = null;
-        let hasVotedThisRound = false; // Локальный флаг голосования
+        let finalResultsAnnounced = false; // Флаг для предотвращения повторной озвучки
+        let lastDetectiveVoteId = null; // Для отслеживания смены выбора детектива
 
         const ROLES = { MAFIA: 'Мафия', CIVILIAN: 'Мирный житель', DOCTOR: 'Доктор', DETECTIVE: 'Детектив' };
-        const ROLE_ICONS = { 'Мафия': '', 'Мирный житель': '👤', 'Доктор': '💉', 'Детектив': '🔍' };
+        const ROLE_ICONS = { 'Мафия': '🔪', 'Мирный житель': '👤', 'Доктор': '💉', 'Детектив': '' };
 
         function initAudio() {
             if (audioInitialized) return;
@@ -480,12 +482,6 @@
                 gameData = game;
                 const myPlayer = game.players[myPlayerId];
                 if (myPlayer && myPlayer.role) myRole = myPlayer.role;
-                
-                // Сброс локального флага голосования при смене фазы на voting
-                if (game.phase === 'voting' && myPlayer.voted === null) {
-                    hasVotedThisRound = false;
-                }
-                
                 updateUI(game);
             });
         }
@@ -567,7 +563,6 @@
 
             renderPlayerList(game);
 
-            // ИСПРАВЛЕНИЕ: Не скрываем панель если детектив смотрит результат
             const detectiveViewingResult = game.phase === 'night' && 
                                            game.activeAction === 'detective' && 
                                            game.detectiveActionDone && 
@@ -605,16 +600,16 @@
                         <div class="player-item dead">
                             <div>
                                 <div class="player-name">${p.name}</div>
-                                <div class="player-role" style="color: #ff6b6b;">💀 Мертв</div>
+                                <div class="player-role" style="color: #ff6b6b;"> Мертв</div>
                             </div>
-                            <div class="player-status" style="color: #ff6b6b;">💀</div>
+                            <div class="player-status" style="color: #ff6b6b;"></div>
                         </div>
                     `;
                 } else if (isNight) {
                     html += `
                         <div class="player-item">
                             <div class="player-name">${p.name}</div>
-                            <div class="player-role" style="color: #888; font-style: italic;"> Спит</div>
+                            <div class="player-role" style="color: #888; font-style: italic;">🌙 Спит</div>
                         </div>
                     `;
                 } else {
@@ -657,8 +652,23 @@
                 const detectiveActionDone = gameData.detectiveActionDone;
                 const detectiveResultSeen = gameData.detectiveResultSeen;
                 
+                // ИСПРАВЛЕНИЕ: Проверяем что детектив только что сделал выбор (а не в прошлой ночи)
+                const currentDetectiveVote = gameData.detectiveVote;
+                
                 if (detectiveActionDone && !detectiveResultSeen) {
-                    const target = Object.values(gameData.players).find(p => p.id === gameData.detectiveVote);
+                    // Проверяем что это новый выбор (не тот же что уже показывали)
+                    if (currentDetectiveVote !== lastDetectiveVoteId) {
+                        lastDetectiveVoteId = currentDetectiveVote;
+                        detectiveResultStartTime = Date.now();
+                        
+                        // Очищаем предыдущий таймер
+                        if (detectiveResultTimer) {
+                            clearInterval(detectiveResultTimer);
+                            detectiveResultTimer = null;
+                        }
+                    }
+                    
+                    const target = Object.values(gameData.players).find(p => p.id === currentDetectiveVote);
                     if (target) {
                         const isMafia = target.role === 'Мафия';
                         panel.classList.remove('hidden');
@@ -673,37 +683,33 @@
                             </div>
                         `;
                         
-                        // ИСПРАВЛЕНИЕ: Запускаем таймер гарантированно, очищая предыдущий
-                        if (detectiveResultTimer) {
-                            clearInterval(detectiveResultTimer);
-                        }
-                        
-                        detectiveResultStartTime = Date.now();
-                        const DURATION = 5000; // 5 секунд
-                        
-                        // Анимация прогресс-бара
-                        detectiveResultTimer = setInterval(() => {
-                            const elapsed = Date.now() - detectiveResultStartTime;
-                            const remaining = Math.max(0, DURATION - elapsed);
-                            const percent = (remaining / DURATION) * 100;
+                        // Запускаем таймер только если он еще не запущен
+                        if (!detectiveResultTimer) {
+                            const DURATION = 5000;
                             
-                            const fill = document.getElementById('detectiveTimerFill');
-                            const text = document.getElementById('detectiveTimerText');
-                            
-                            if (fill) fill.style.width = percent + '%';
-                            if (text) text.textContent = `Запомните результат... ${Math.ceil(remaining / 1000)} сек`;
-                            
-                            if (remaining <= 0) {
-                                clearInterval(detectiveResultTimer);
-                                detectiveResultTimer = null;
+                            detectiveResultTimer = setInterval(() => {
+                                const elapsed = Date.now() - detectiveResultStartTime;
+                                const remaining = Math.max(0, DURATION - elapsed);
+                                const percent = (remaining / DURATION) * 100;
                                 
-                                const ref = database.ref(`games/${currentGameId}`);
-                                ref.update({ 
-                                    detectiveResultSeen: true,
-                                    lastActionAt: firebase.database.ServerValue.TIMESTAMP 
-                                });
-                            }
-                        }, 100);
+                                const fill = document.getElementById('detectiveTimerFill');
+                                const text = document.getElementById('detectiveTimerText');
+                                
+                                if (fill) fill.style.width = percent + '%';
+                                if (text) text.textContent = `Запомните результат... ${Math.ceil(remaining / 1000)} сек`;
+                                
+                                if (remaining <= 0) {
+                                    clearInterval(detectiveResultTimer);
+                                    detectiveResultTimer = null;
+                                    
+                                    const ref = database.ref(`games/${currentGameId}`);
+                                    ref.update({ 
+                                        detectiveResultSeen: true,
+                                        lastActionAt: firebase.database.ServerValue.TIMESTAMP 
+                                    });
+                                }
+                            }, 100);
+                        }
                     }
                     return;
                 }
@@ -808,7 +814,7 @@
             if (hasDetective) {
                 playSound('wake');
                 speak('Просыпается детектив');
-                await ref.update({ activeAction: 'detective', log: [...currentLog, ' Детектив просыпается'] });
+                await ref.update({ activeAction: 'detective', log: [...currentLog, '🔍 Детектив просыпается'] });
             } else {
                 playSound('day');
                 speak('Ночь закончилась. Наступает день');
@@ -850,7 +856,6 @@
             
             playSound('day');
             
-            // ИСПРАВЛЕНИЕ: Озвучка результатов ночи
             if (victimName) {
                 speak(`Утром обнаружено тело. ${victimName} не проснулся.`);
             } else if (wasSaved) {
@@ -868,9 +873,6 @@
             for (const playerId in gameData.players) {
                 await ref.child(`players/${playerId}/voted`).set(null);
             }
-            
-            // Сброс локального флага
-            hasVotedThisRound = false;
         }
 
         function showVotingSection(game) {
@@ -891,22 +893,32 @@
                 return;
             }
 
-            // ИСПРАВЛЕНИЕ: Используем локальный флаг + проверку из Firebase
-            const hasVoted = hasVotedThisRound || (myPlayer.voted !== null && myPlayer.voted !== undefined);
+            const hasVoted = myPlayer.voted !== null && myPlayer.voted !== undefined;
+            
+            // ИСПРАВЛЕНИЕ: Исключаем себя из списка кандидатов
+            const aliveOthers = Object.values(game.players).filter(p => p.alive && p.id !== myPlayerId);
             
             if (hasVoted) {
                 const votedFor = Object.values(game.players).find(p => p.id === myPlayer.voted);
                 buttons.innerHTML = `
-                    <div class="waiting-message">
-                        ✅ Вы уже проголосовали за <strong>${votedFor ? votedFor.name : 'неизвестного'}</strong><br>
-                        Ожидание остальных игроков...
+                    <div class="waiting-message" style="margin-bottom: 15px;">
+                        ✅ Вы проголосовали за <strong>${votedFor ? votedFor.name : 'неизвестного'}</strong><br>
+                        <span style="font-size: 0.8em; color: #888;">Нажмите на того же игрока чтобы снять голос</span>
                     </div>
+                    ${aliveOthers.map(p => {
+                        const isVotedFor = myPlayer.voted === p.id;
+                        return `
+                            <button class="vote-button ${isVotedFor ? 'voted' : ''}" onclick="castVote('${p.id}')">
+                                ${p.name} ${isVotedFor ? '✓' : ''}
+                                <span class="vote-count">${(game.votes && game.votes[p.id]) || 0}</span>
+                            </button>
+                        `;
+                    }).join('')}
                 `;
                 return;
             }
 
-            const alive = Object.values(game.players).filter(p => p.alive);
-            buttons.innerHTML = alive.map(p => `
+            buttons.innerHTML = aliveOthers.map(p => `
                 <button class="vote-button" onclick="castVote('${p.id}')">
                     ${p.name}
                     <span class="vote-count">${(game.votes && game.votes[p.id]) || 0}</span>
@@ -916,32 +928,32 @@
 
         async function castVote(targetId) {
             try {
-                // ИСПРАВЛЕНИЕ: Двойная проверка - локальный флаг + транзакция Firebase
-                if (hasVotedThisRound) {
-                    alert('Вы уже проголосовали в этом раунде!');
-                    return;
-                }
-                
                 const ref = database.ref(`games/${currentGameId}`);
+                const myPlayer = gameData.players[myPlayerId];
                 
-                // Атомарная проверка через транзакцию
-                const voteResult = await ref.child(`players/${myPlayerId}/voted`).transaction(current => {
-                    if (current !== null && current !== undefined) {
-                        return; // уже голосовал - отменяем
-                    }
-                    return targetId;
-                });
-                
-                if (!voteResult.committed) {
-                    alert('Вы уже проголосовали! Голос не принят.');
+                // ИСПРАВЛЕНИЕ: Нельзя голосовать за себя
+                if (targetId === myPlayerId) {
+                    alert('Нельзя голосовать за себя!');
                     return;
                 }
                 
-                // Голос засчитан - увеличиваем счётчик
-                await ref.child(`votes/${targetId}`).transaction(c => (c || 0) + 1);
+                // ИСПРАВЛЕНИЕ: Если уже голосовал за этого игрока - снимаем голос
+                if (myPlayer.voted === targetId) {
+                    // Снимаем голос
+                    await ref.child(`players/${myPlayerId}/voted`).set(null);
+                    await ref.child(`votes/${targetId}`).transaction(c => Math.max(0, (c || 1) - 1));
+                    playSound('action');
+                    return;
+                }
                 
-                // Устанавливаем локальный флаг
-                hasVotedThisRound = true;
+                // Если голосовал за другого - сначала снимаем старый голос
+                if (myPlayer.voted !== null && myPlayer.voted !== undefined) {
+                    await ref.child(`votes/${myPlayer.voted}`).transaction(c => Math.max(0, (c || 1) - 1));
+                }
+                
+                // Ставим новый голос
+                await ref.child(`players/${myPlayerId}/voted`).set(targetId);
+                await ref.child(`votes/${targetId}`).transaction(c => (c || 0) + 1);
                 
                 playSound('action');
             } catch (e) { 
@@ -999,7 +1011,7 @@
                 await ref.update({ phase: 'finished', log: [...newLog, '🎉 Мирные жители победили!'] });
                 speak('Мирные жители победили! Поздравляем!');
             } else if (aliveMafia >= aliveCivilians) {
-                await ref.update({ phase: 'finished', log: [...newLog, ' Мафия победила!'] });
+                await ref.update({ phase: 'finished', log: [...newLog, '🔪 Мафия победила!'] });
                 speak('Мафия победила! Город в их руках.');
             } else {
                 setTimeout(async () => {
@@ -1016,7 +1028,7 @@
                         detectiveResultSeen: false,
                         votes: {},
                         lastActionAt: 0,
-                        log: [...newLog, ` Ночь ${game.day + 1}`, ' Мафия просыпается']
+                        log: [...newLog, `🌙 Ночь ${game.day + 1}`, '🔪 Мафия просыпается']
                     });
                 }, 5000);
             }
@@ -1044,15 +1056,19 @@
                 `;
             }).join('');
             
-            // ИСПРАВЛЕНИЕ: Озвучка ролей всех игроков в конце
-            setTimeout(() => {
-                const rolesText = Object.values(game.players).map(p => {
-                    const status = p.alive ? 'жив' : 'мёртв';
-                    return `${p.name} - ${p.role}, ${status}`;
-                }).join('. ');
+            // ИСПРАВЛЕНИЕ: Озвучиваем итоги только один раз
+            if (!finalResultsAnnounced) {
+                finalResultsAnnounced = true;
                 
-                speak(`${winnerText}. Итоги: ${rolesText}.`);
-            }, 1500);
+                setTimeout(() => {
+                    const rolesText = Object.values(game.players).map(p => {
+                        const status = p.alive ? 'жив' : 'мёртв';
+                        return `${p.name} - ${p.role}, ${status}`;
+                    }).join('. ');
+                    
+                    speak(`${winnerText}. Итоги: ${rolesText}.`);
+                }, 1500);
+            }
         }
 
         async function startGame() {
@@ -1064,6 +1080,10 @@
             voiceEnabled = document.getElementById('voiceEnabled').checked;
             soundEnabled = document.getElementById('soundEnabled').checked;
             initAudio();
+            
+            // Сброс флагов
+            finalResultsAnnounced = false;
+            lastDetectiveVoteId = null;
 
             try {
                 const ref = database.ref(`games/${currentGameId}`);
