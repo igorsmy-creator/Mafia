@@ -774,10 +774,51 @@
         // ========== УПРАВЛЕНИЕ ИГРОЙ (ХОСТ) ==========
 
         async function startGame() {
-            if (!gameData) {
-                alert('Данные игры не загружены!');
-                return;
+    if (!gameData) {
+        alert('Данные игры не загружены!');
+        return;
+    }
+
+    if (myPlayerId !== gameData.hostId) {
+        alert('Только хост может начать игру!');
+        return;
+    }
+
+    const playerCount = Object.keys(gameData.players).length;
+    if (playerCount < 4) {
+        alert('Нужно минимум 4 игрока!');
+        return;
+    }
+
+    try {
+        const gameRef = database.ref(`games/${currentGameId}`);
+        const roles = distributeRoles(playerCount);
+        const players = Object.keys(gameData.players);
+        
+        // Сначала меняем фазу
+        await gameRef.child('phase').set('role_reveal');
+        
+        // Затем раздаем роли каждому игроку отдельно
+        players.forEach((playerId, index) => {
+            gameRef.child(`players/${playerId}/role`).set(roles[index]);
+        });
+
+        // Через 15 секунд начинаем первую ночь
+        setTimeout(async () => {
+            try {
+                await gameRef.child('phase').set('night');
+                await gameRef.child('day').set(1);
+                await gameRef.child('activeAction').set('mafia');
+                await gameRef.child('log').set(['=== Ночь 1 ===', 'Мафия просыпается']);
+            } catch (error) {
+                console.error('Error starting night:', error);
             }
+        }, 15000);
+    } catch (error) {
+        console.error('Error starting game:', error);
+        alert('Ошибка начала игры: ' + error.message);
+    }
+}
 
             if (myPlayerId !== gameData.hostId) {
                 alert('Только хост может начать игру!');
