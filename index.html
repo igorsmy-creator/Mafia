@@ -161,6 +161,38 @@
             background: linear-gradient(90deg, #ff6b6b, #ffd93d);
             transition: width 0.3s ease;
         }
+        .vote-stats {
+            background: rgba(0,0,0,0.4);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border: 1px solid #4ecdc4;
+        }
+        .vote-stats h4 {
+            color: #ffd93d;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .vote-stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin: 5px 0;
+            background: rgba(255,255,255,0.05);
+            border-radius: 5px;
+        }
+        .vote-stat-name {
+            font-weight: bold;
+        }
+        .vote-stat-voted {
+            color: #4ecdc4;
+            font-size: 0.9em;
+        }
+        .vote-stat-votes {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
         .log {
             background: rgba(0,0,0,0.5);
             padding: 15px;
@@ -222,7 +254,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎭 МАФИЯ ОНЛАЙН 🎭</h1>
+        <h1> МАФИЯ ОНЛАЙН 🎭</h1>
         
         <div id="menuScreen" class="screen">
             <h2 style="text-align: center; margin-bottom: 20px;">Добро пожаловать!</h2>
@@ -238,8 +270,8 @@
                 </label>
             </div>
             <input type="text" id="playerNameInput" placeholder="Введите ваше имя">
-            <button onclick="createGame()"> Создать игру</button>
-            <button class="btn-secondary" onclick="showJoinScreen()"> Присоединиться к игре</button>
+            <button onclick="createGame()">🎮 Создать игру</button>
+            <button class="btn-secondary" onclick="showJoinScreen()">🔗 Присоединиться к игре</button>
         </div>
 
         <div id="joinScreen" class="screen hidden">
@@ -274,7 +306,7 @@
             <div class="in-game-settings">
                 <button class="btn-small" onclick="toggleSettings()">⚙️ Настройки</button>
                 <div id="settingsDropdown" class="settings-dropdown">
-                    <h3 style="color: #ffd93d; margin-bottom: 10px;"> Звук</h3>
+                    <h3 style="color: #ffd93d; margin-bottom: 10px;">🔊 Звук</h3>
                     <label class="checkbox-label">
                         <input type="checkbox" id="gameVoiceEnabled" checked onchange="updateSoundSettings()">
                         <span>Голосовое сопровождение</span>
@@ -295,6 +327,7 @@
             <div id="voteSection" class="vote-section hidden">
                 <h3 style="text-align: center; margin-bottom: 15px;">🗳️ Голосование</h3>
                 <div id="voteButtons"></div>
+                <div id="voteStats"></div>
                 <button id="endVotingBtn" onclick="endVoting()" style="margin-top: 15px;" class="hidden">Завершить голосование (только хост)</button>
             </div>
             <div id="playersList"></div>
@@ -344,7 +377,7 @@
         let roleTimeoutTimer = null;
 
         const ROLES = { MAFIA: 'Мафия', CIVILIAN: 'Мирный житель', DOCTOR: 'Доктор', DETECTIVE: 'Детектив' };
-        const ROLE_ICONS = { 'Мафия': '🔪', 'Мирный житель': '👤', 'Доктор': '💉', 'Детектив': '🔍' };
+        const ROLE_ICONS = { 'Мафия': '🔪', 'Мирный житель': '👤', 'Доктор': '💉', 'Детектив': '' };
 
         function initAudio() {
             if (audioInitialized) return;
@@ -515,7 +548,7 @@
             } else if (game.phase === 'role_reveal') {
                 if (myPlayer.role) {
                     showRoleScreen();
-                    document.getElementById('roleIcon').textContent = ROLE_ICONS[myPlayer.role] || '🎭';
+                    document.getElementById('roleIcon').textContent = ROLE_ICONS[myPlayer.role] || '';
                     document.getElementById('roleName').textContent = myPlayer.role;
                     document.getElementById('roleDescription').textContent = getRoleDesc(myPlayer.role);
                 }
@@ -679,8 +712,11 @@
                     if (target) {
                         const isMafia = target.role === 'Мафия';
                         
-                        // ИСПРАВЛЕНИЕ: Используем локальный таймер вместо Firebase
-                        if (!detectiveLocalTimer) {
+                        // ИСПРАВЛЕНИЕ: Проверяем, что DOM уже создан
+                        const existingResult = document.getElementById('detectiveTimerFill');
+                        
+                        if (!detectiveLocalTimer && !existingResult) {
+                            // Первый вызов - создаём DOM и запускаем таймер
                             detectiveLocalStartTime = Date.now();
                             
                             panel.classList.remove('hidden');
@@ -712,7 +748,6 @@
                                     clearInterval(detectiveLocalTimer);
                                     detectiveLocalTimer = null;
                                     
-                                    // Теперь устанавливаем в Firebase что результат просмотрен
                                     const ref = database.ref(`games/${currentGameId}`);
                                     ref.update({ 
                                         detectiveResultSeen: true,
@@ -720,6 +755,9 @@
                                     });
                                 }
                             }, 100);
+                        } else if (detectiveLocalTimer) {
+                            // Таймер уже работает - просто убеждаемся что панель видна
+                            panel.classList.remove('hidden');
                         }
                     }
                     return;
@@ -788,7 +826,7 @@
                     roleTimeoutTimer = null;
                 }
                 
-                document.getElementById('actionPanel').classList.add('hidden');
+                // НЕ скрываем панель здесь - пусть handleNightAction решает
             } catch (e) { alert('Ошибка: ' + e.message); }
         }
 
@@ -861,11 +899,11 @@
                 if (victim && victim.alive) {
                     if (gameData.doctorVote === gameData.mafiaVote) {
                         wasSaved = true;
-                        newLog.push('💉 Доктор спас жертву мафии!');
+                        newLog.push(' Доктор спас жертву мафии!');
                     } else {
                         await ref.child(`players/${victim.id}/alive`).set(false);
                         victimName = victim.name;
-                        newLog.push(` ${victim.name} был убит ночью`);
+                        newLog.push(`💀 ${victim.name} был убит ночью`);
                     }
                 }
             }
@@ -894,6 +932,7 @@
         function showVotingSection(game) {
             const section = document.getElementById('voteSection');
             const buttons = document.getElementById('voteButtons');
+            const statsDiv = document.getElementById('voteStats');
             const myPlayer = game.players[myPlayerId];
             section.classList.remove('hidden');
 
@@ -906,13 +945,13 @@
 
             if (!myPlayer.alive) {
                 buttons.innerHTML = '<div class="waiting-message">💀 Вы не можете голосовать</div>';
+                statsDiv.innerHTML = '';
                 return;
             }
 
             const hasVoted = myPlayer.voted !== null && myPlayer.voted !== undefined;
             const aliveOthers = Object.values(game.players).filter(p => p.alive && p.id !== myPlayerId);
             
-            // ИСПРАВЛЕНИЕ: Находим максимальное количество голосов для прогресс-бара
             const maxVotes = Math.max(1, ...Object.values(game.votes || {}).map(v => v || 0));
             
             if (hasVoted) {
@@ -939,24 +978,45 @@
                         `;
                     }).join('')}
                 `;
-                return;
+            } else {
+                buttons.innerHTML = aliveOthers.map(p => {
+                    const voteCount = (game.votes && game.votes[p.id]) || 0;
+                    const votePercent = (voteCount / maxVotes) * 100;
+                    return `
+                        <button class="vote-button" onclick="castVote('${p.id}')">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span>${p.name}</span>
+                                <span class="vote-count">${voteCount} голос${voteCount === 1 ? '' : voteCount < 5 ? 'а' : 'ов'}</span>
+                            </div>
+                            <div class="vote-bar">
+                                <div class="vote-bar-fill" style="width: ${votePercent}%"></div>
+                            </div>
+                        </button>
+                    `;
+                }).join('');
             }
 
-            buttons.innerHTML = aliveOthers.map(p => {
-                const voteCount = (game.votes && game.votes[p.id]) || 0;
-                const votePercent = (voteCount / maxVotes) * 100;
-                return `
-                    <button class="vote-button" onclick="castVote('${p.id}')">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span>${p.name}</span>
-                            <span class="vote-count">${voteCount} голос${voteCount === 1 ? '' : voteCount < 5 ? 'а' : 'ов'}</span>
-                        </div>
-                        <div class="vote-bar">
-                            <div class="vote-bar-fill" style="width: ${votePercent}%"></div>
-                        </div>
-                    </button>
-                `;
-            }).join('');
+            // ИСПРАВЛЕНИЕ: Показываем статистику голосования для всех живых игроков
+            const allAlivePlayers = Object.values(game.players).filter(p => p.alive);
+            const myVoteCount = (game.votes && game.votes[myPlayerId]) || 0;
+            
+            statsDiv.innerHTML = `
+                <div class="vote-stats">
+                    <h4>📊 Статистика голосования</h4>
+                    ${allAlivePlayers.map(p => {
+                        const votedFor = p.voted ? Object.values(game.players).find(pl => pl.id === p.voted) : null;
+                        const voteCount = (game.votes && game.votes[p.id]) || 0;
+                        const isMe = p.id === myPlayerId;
+                        return `
+                            <div class="vote-stat-item">
+                                <span class="vote-stat-name">${p.name} ${isMe ? '(Вы)' : ''}</span>
+                                <span class="vote-stat-voted">${votedFor ? `голосует за: ${votedFor.name}` : 'не голосовал'}</span>
+                                <span class="vote-stat-votes">${voteCount} голос${voteCount === 1 ? '' : voteCount < 5 ? 'а' : 'ов'} за него</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
         }
 
         async function castVote(targetId) {
@@ -1020,7 +1080,7 @@
             if (eliminatedPlayer && maxVotes > 0 && !tie) {
                 const player = gameData.players[eliminatedPlayer];
                 await ref.child(`players/${eliminatedPlayer}/alive`).set(false);
-                newLog.push(`🗳️ ${player.name} был исключен (${maxVotes} голосов). Роль: ${player.role}`);
+                newLog.push(`️ ${player.name} был исключен (${maxVotes} голосов). Роль: ${player.role}`);
                 speak(`${player.name} был исключен из игры. Его роль: ${player.role}`);
             } else if (tie) {
                 newLog.push('🗳️ Голоса разделились поровну. Никто не был исключен.');
@@ -1116,7 +1176,7 @@
                             lastActionAt: 0,
                             detectiveActionDone: false,
                             detectiveResultSeen: false,
-                            log: ['🌙 Наступает ночь. Город засыпает.', ' Мафия просыпается']
+                            log: ['🌙 Наступает ночь. Город засыпает.', '🔪 Мафия просыпается']
                         });
                         setTimeout(() => {
                             speak('Просыпается мафия');
